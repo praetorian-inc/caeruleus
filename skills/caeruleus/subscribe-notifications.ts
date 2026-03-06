@@ -1,0 +1,159 @@
+/**
+ * subscribe-notifications.ts — Notification/indication traffic capture (Flow 2.3)
+ *
+ * Subscribes to all notify/indicate characteristics, captures traffic over time,
+ * identifies sensitive data in cleartext notifications.
+ * Online: requires caeruleus-server.py (Async Choreography pattern)
+ */
+
+import { z } from 'zod';
+import { readFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
+import { callBle } from './lib/client.js';
+import type { IBleClient } from './lib/types.js';
+import { BleError } from './lib/errors.js';
+import { BleMacAddressSchema, estimateTokens } from './lib/types.js';
+
+export const subscribeNotificationsParams = z.object({
+  mac_address: BleMacAddressSchema,
+  gatt_map_path: z.string().optional(),
+  uuids: z.array(z.string()).optional(),
+  duration: z.number().min(1).max(3600).default(30),
+});
+export type SubscribeNotificationsInput = z.infer<typeof subscribeNotificationsParams>;
+
+// Patterns that indicate sensitive data in notification payloads
+const SENSITIVE_PATTERNS = [
+  { name: 'GPS Coordinates', pattern: /[-+]?\d{1,3}\.\d{4,}/ },
+  { name: 'Temperature', pattern: /\d{2,3}\.\d{1,2}/ },
+  { name: 'Email', pattern: /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/ },
+  { name: 'Phone Number', pattern: /\+?\d{10,15}/ },
+  { name: 'Auth Token', pattern: /[a-fA-F0-9]{32,}/ },
+];
+
+export const subscribeNotifications = {
+  name: 'caeruleus.subscribe_notifications',
+  description:
+    'Subscribe to BLE notification/indication characteristics and capture traffic. Identifies sensitive data in cleartext.',
+  parameters: subscribeNotificationsParams,
+
+  async execute(
+    input: SubscribeNotificationsInput,
+    client?: IBleClient,
+  ): Promise<Record<string, unknown>> {
+    const validated = subscribeNotificationsParams.parse(input);
+    const callFn = client
+      ? (cmd: string, params: Record<string, unknown>) =>
+          client.call({ command: cmd, params })
+      : callBle;
+
+    // Ensure connected
+    await callFn('connect', { mac_address: validated.mac_address });
+
+    // Determine which UUIDs to subscribe to
+    let targetUuids = validated.uuids || [];
+
+    if (targetUuids.length === 0 && validated.gatt_map_path) {
+      const gattRaw = await readFile(validated.gatt_map_path, 'utf-8');
+      const gattMap = JSON.parse(gattRaw);
+      for (const svc of gattMap.services || []) {
+        for (const char of svc.characteristics || []) {
+          if (char.properties?.notify || char.properties?.indicate) {
+            targetUuids.push(char.uuid);
+          }
+        }
+      }
+    }
+
+    if (targetUuids.length === 0) {
+      return {
+        error: 'No notifiable/indicatable characteristics found',
+        suggestion: 'Provide uuids array or gatt_map_path with notify/indicate characteristics',
+      };
+    }
+
+    const captures: Array<Record<string, unknown>> = [];
+    const findings: Array<Record<string, unknown>> = [];
+
+    for (const uuid of targetUuids) {
+      try {
+        const subResult = (await callFn('subscribe', {
+          mac_address: validated.mac_address,
+          uuid,
+          duration: validated.duration,
+        })) as Record<string, unknown>;
+
+        const notifications = (subResult.notifications as Array<Record<string, unknown>>) || [];
+
+        // Analyze each notification for sensitive data
+        const sensitiveHits: Array<Record<string, unknown>> = [];
+        for (const notif of notifications) {
+          const decoded = notif.decoded as string | null;
+          if (decoded) {
+            for (const sp of SENSITIVE_PATTERNS) {
+              if (sp.pattern.test(decoded)) {
+                sensitiveHits.push({
+                  pattern: sp.name,
+                  value: decoded,
+                  timestamp: notif.timestamp,
+                });
+              }
+            }
+          }
+        }
+
+        captures.push({
+          uuid,
+          notification_count: notifications.length,
+          notifications,
+          sensitive_data_detected: sensitiveHits.length > 0,
+          sensitive_hits: sensitiveHits,
+        });
+
+        if (sensitiveHits.length > 0) {
+          findings.push({
+            type: 'cleartext_sensitive_data',
+            severity: 'high',
+            uuid,
+            description: `Sensitive data detected in cleartext notifications from ${uuid}`,
+            patterns_matched: sensitiveHits.map((h) => h.pattern),
+          });
+        }
+      } catch (e) {
+        captures.push({
+          uuid,
+          error: (e as Error).message,
+          notification_count: 0,
+        });
+      }
+    }
+
+    const result = {
+      duration_seconds: validated.duration,
+      characteristics_monitored: targetUuids.length,
+      captures,
+      findings,
+      total_notifications: captures.reduce(
+        (sum, c) => sum + ((c.notification_count as number) || 0),
+        0,
+      ),
+      estimatedTokens: 0,
+    };
+
+    result.estimatedTokens = estimateTokens(result);
+    return result;
+  },
+};
+
+const isMain = process.argv[1] === fileURLToPath(import.meta.url);
+if (isMain) {
+  const input = JSON.parse(process.argv[2] ?? '{}');
+  subscribeNotifications
+    .execute(input)
+    .then((r) => console.log(JSON.stringify(r, null, 2)))
+    .catch((e: unknown) => {
+      const err = e as BleError;
+      console.error(JSON.stringify({ error: err.message, code: err.code }, null, 2));
+      process.exit(1);
+    });
+}
