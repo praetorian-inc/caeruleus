@@ -1,11 +1,13 @@
 /**
- * BleClient — Manages persistent caeruleus-server.py process for BLE operations.
+ * BleClient — Connects to persistent caeruleus-server.py via Unix domain socket.
  *
- * Communicates via YAML over stdin/stdout following the malum/draco IPC pattern.
- * Auto-starts server on first call, auto-restarts on crash.
+ * The server runs as a detached background process, persisting BLE connections
+ * across multiple skill invocations. Auto-starts if not running.
  */
 
-import { spawn, type ChildProcess } from 'node:child_process';
+import { spawn } from 'node:child_process';
+import { connect as netConnect, type Socket } from 'node:net';
+import { existsSync } from 'node:fs';
 import { EventEmitter } from 'node:events';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -21,8 +23,9 @@ import { BleError, BleServerNotRunningError, BleTimeoutError } from './errors.js
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+const SOCKET_PATH = process.env.CAERULEUS_SOCKET || '/tmp/caeruleus.sock';
 const DEFAULT_TIMEOUT_MS = 60_000;
-const READY_TIMEOUT_MS = 15_000;
+const SERVER_STARTUP_TIMEOUT_MS = 15_000;
 const DELIMITER = '\n---\n';
 
 interface PendingRequest {
@@ -34,25 +37,18 @@ interface PendingRequest {
 let _instance: BleClient | null = null;
 
 export class BleClient extends EventEmitter implements IBleClient {
-  private process: ChildProcess | null = null;
-  private ready = false;
+  private socket: Socket | null = null;
   private buffer = '';
   private pendingResponses: Map<number, PendingRequest> = new Map();
   private requestId = 0;
   private connectedMac: string | null = null;
-  private startingPromise: Promise<void> | null = null;
+  private connectingPromise: Promise<void> | null = null;
 
   private readonly python: string;
-  private readonly adapter: string;
-  private readonly transport: string;
-  private readonly deviceId: string;
 
   constructor() {
     super();
     this.python = process.env.CAERULEUS_PYTHON || 'python3';
-    this.adapter = process.env.CAERULEUS_ADAPTER || 'hci0';
-    this.transport = process.env.CAERULEUS_TRANSPORT || 'usb';
-    this.deviceId = process.env.CAERULEUS_DEVICE_ID || '';
   }
 
   /** Singleton access */
@@ -63,89 +59,98 @@ export class BleClient extends EventEmitter implements IBleClient {
     return _instance;
   }
 
-  /** Spawn caeruleus-server.py and wait for ready signal */
-  private async startServer(): Promise<void> {
-    if (this.startingPromise) return this.startingPromise;
+  /** Ensure connected to server socket, starting server if needed */
+  private async ensureSocket(): Promise<void> {
+    if (this.socket && !this.socket.destroyed) return;
+    if (this.connectingPromise) return this.connectingPromise;
 
-    this.startingPromise = (async () => {
-      const serverPath = join(__dirname, '..', 'caeruleus-server.py');
+    this.connectingPromise = (async () => {
+      // Try connecting to existing server
+      try {
+        await this.connectToSocket();
+        return;
+      } catch {
+        // No server running, start one
+      }
 
-      this.process = spawn(this.python, [serverPath], {
-        stdio: ['pipe', 'pipe', 'pipe'],
-        env: {
-          ...process.env,
-          CAERULEUS_ADAPTER: this.adapter,
-          CAERULEUS_TRANSPORT: this.transport,
-          CAERULEUS_DEVICE_ID: this.deviceId,
-        },
-      });
+      this.spawnServer();
 
-      this.process.stderr?.on('data', (data: Buffer) => {
-        const msg = data.toString().trim();
-        if (msg) {
-          console.error(`[caeruleus-server] ${msg}`);
+      // Wait for socket to become available
+      const deadline = Date.now() + SERVER_STARTUP_TIMEOUT_MS;
+      while (Date.now() < deadline) {
+        await new Promise((r) => setTimeout(r, 300));
+        try {
+          await this.connectToSocket();
+          return;
+        } catch {
+          // Not ready yet
         }
-      });
-
-      this.process.stdout?.on('data', (data: Buffer) => {
-        this.buffer += data.toString();
-        this.processBuffer();
-      });
-
-      this.process.on('exit', (code, signal) => {
-        console.error(
-          `[caeruleus-server] exited (code=${code}, signal=${signal})`,
-        );
-        this.resetState();
-      });
-
-      this.process.on('error', (err) => {
-        console.error(`[caeruleus-server] spawn error: ${err.message}`);
-        this.resetState();
-      });
-
-      // Kill child process when parent exits to prevent orphaned servers
-      const cleanup = () => {
-        if (this.process && !this.process.killed) {
-          this.process.kill();
-        }
-      };
-      process.once('exit', cleanup);
-      process.once('SIGTERM', cleanup);
-      process.once('SIGINT', cleanup);
-
-      await this.waitForReady();
+      }
+      throw new BleServerNotRunningError();
     })();
 
     try {
-      await this.startingPromise;
+      await this.connectingPromise;
     } finally {
-      this.startingPromise = null;
+      this.connectingPromise = null;
     }
   }
 
-  /** Wait for server to send ready signal */
-  private waitForReady(): Promise<void> {
-    return new Promise<void>((resolve, reject) => {
-      if (this.ready) {
-        resolve();
+  /** Connect to the server's Unix domain socket */
+  private connectToSocket(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      if (!existsSync(SOCKET_PATH)) {
+        reject(new Error('Socket file does not exist'));
         return;
       }
 
-      const timer = setTimeout(() => {
-        reject(new BleTimeoutError('Server startup', READY_TIMEOUT_MS));
-      }, READY_TIMEOUT_MS);
+      const socket = netConnect(SOCKET_PATH);
+      const timeout = setTimeout(() => {
+        socket.destroy();
+        reject(new Error('Socket connection timeout'));
+      }, 5000);
 
-      this.once('ready', () => {
-        clearTimeout(timer);
+      socket.on('connect', () => {
+        clearTimeout(timeout);
+        this.socket = socket;
+        this.buffer = '';
+
+        socket.on('data', (data: Buffer) => {
+          this.buffer += data.toString();
+          this.processBuffer();
+        });
+
+        socket.on('close', () => {
+          this.resetState();
+        });
+
+        socket.on('error', (err) => {
+          console.error(`[ble-client] socket error: ${err.message}`);
+        });
+
         resolve();
       });
 
-      this.once('error', (err) => {
-        clearTimeout(timer);
+      socket.on('error', (err) => {
+        clearTimeout(timeout);
         reject(err);
       });
     });
+  }
+
+  /** Spawn caeruleus-server.py as a detached background process */
+  private spawnServer(): void {
+    const serverPath = join(__dirname, '..', 'caeruleus-server.py');
+    const child = spawn(this.python, [serverPath, '--socket'], {
+      detached: true,
+      stdio: 'ignore',
+      env: {
+        ...process.env,
+        CAERULEUS_SOCKET: SOCKET_PATH,
+      },
+    });
+    child.unref();
+    console.error(`[ble-client] Started server (pid=${child.pid})`);
   }
 
   /** Parse YAML documents delimited by \n---\n */
@@ -171,19 +176,8 @@ export class BleClient extends EventEmitter implements IBleClient {
     }
   }
 
-  /** Route response to pending promise or handle ready signal */
+  /** Route response to pending promise */
   private handleResponse(response: CaeruleusResponse): void {
-    // Ready signal from server
-    if (
-      response.status === 'ok' &&
-      (response as CaeruleusResponse & { result?: { ready?: boolean } }).result
-        ?.ready
-    ) {
-      this.ready = true;
-      this.emit('ready');
-      return;
-    }
-
     const id = response.id;
     if (id === undefined || !this.pendingResponses.has(id)) {
       console.error(`[ble-client] Unmatched response id=${id}`);
@@ -211,10 +205,9 @@ export class BleClient extends EventEmitter implements IBleClient {
     }
   }
 
-  /** Reset state after server exit */
+  /** Reset state after socket close */
   private resetState(): void {
-    this.ready = false;
-    this.process = null;
+    this.socket = null;
     this.connectedMac = null;
     this.buffer = '';
 
@@ -227,9 +220,7 @@ export class BleClient extends EventEmitter implements IBleClient {
 
   /** Send YAML request to server */
   async call(params: CaeruleusCallParams): Promise<unknown> {
-    if (!this.process || !this.ready) {
-      await this.startServer();
-    }
+    await this.ensureSocket();
 
     const id = this.requestId++;
     const request: CaeruleusRequest = {
@@ -239,7 +230,7 @@ export class BleClient extends EventEmitter implements IBleClient {
     };
 
     const yamlText = YAML.stringify(request);
-    this.process!.stdin!.write(yamlText + DELIMITER);
+    this.socket!.write(yamlText + DELIMITER);
 
     const timeoutMs =
       (params.params?.timeout_ms as number) || DEFAULT_TIMEOUT_MS;
@@ -264,15 +255,15 @@ export class BleClient extends EventEmitter implements IBleClient {
     };
   }
 
-  /** Graceful shutdown */
+  /** Graceful shutdown — stops the background server process */
   async shutdown(): Promise<void> {
-    if (this.process) {
+    if (this.socket && !this.socket.destroyed) {
       try {
         await this.call({ command: 'shutdown' });
       } catch {
         // Best-effort
       }
-      this.process.kill();
+      this.socket.destroy();
       this.resetState();
     }
     _instance = null;

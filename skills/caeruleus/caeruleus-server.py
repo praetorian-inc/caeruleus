@@ -988,27 +988,115 @@ def _generate_fuzz_input(strategy: str, iteration: int) -> bytes:
 
 
 # ---------------------------------------------------------------------------
-# Main event loop
+# Command dispatch (shared between stdin and socket modes)
 # ---------------------------------------------------------------------------
 
-async def main():
+SOCKET_PATH = os.environ.get("CAERULEUS_SOCKET", "/tmp/caeruleus.sock")
+
+
+def _classify_error(e: Exception) -> tuple[str, bool]:
+    """Classify an exception into (error_code, recoverable)."""
+    err_str = str(e).lower()
+    if "not connected" in err_str or "disconnect" in err_str:
+        return "CONNECTION_LOST", True
+    if "not found" in err_str:
+        return "DEVICE_NOT_FOUND", True
+    if "permission" in err_str or "not permitted" in err_str:
+        return "PERMISSION_DENIED", False
+    if "timeout" in err_str:
+        return "TIMEOUT", True
+    if "pair" in err_str:
+        return "PAIRING_FAILED", False
+    if "encrypt" in err_str or "auth" in err_str:
+        return "ENCRYPTION_ERROR", False
+    return "UNKNOWN", False
+
+
+async def _dispatch_command(request: dict) -> dict:
+    """Dispatch a single command and return the response dict."""
+    request_id = request.get("id", 0)
+    command = request.get("command", "")
+    params = request.get("params", {})
+
+    handler = COMMANDS.get(command)
+    if handler is None:
+        return {
+            "id": request_id,
+            "status": "error",
+            "error": {
+                "code": "UNKNOWN_COMMAND",
+                "message": f"Unknown command: {command}",
+                "recoverable": False,
+                "suggestion": f"Available: {', '.join(sorted(COMMANDS.keys()))}",
+            },
+        }
+
+    try:
+        result = await handler(params)
+        return {"id": request_id, "status": "ok", "result": result}
+    except Exception as e:
+        _log(f"Command {command} error: {e}")
+        _log(traceback.format_exc())
+        code, recoverable = _classify_error(e)
+        return {
+            "id": request_id,
+            "status": "error",
+            "error": {"code": code, "message": str(e), "recoverable": recoverable},
+        }
+
+
+async def _cleanup_ble():
+    """Disconnect BLE device if connected. Best-effort."""
+    global _client
+    if _client is not None:
+        _log("Disconnecting BLE device...")
+        try:
+            await _client.disconnect()
+            _log("BLE disconnected cleanly")
+        except Exception as e:
+            _log(f"BLE disconnect error (best-effort): {e}")
+        _client = None
+
+
+def _write_yaml_response(response: dict) -> str:
+    """Serialize a response dict to YAML + delimiter."""
+    return yaml.safe_dump(response, default_flow_style=False, allow_unicode=True) + DELIMITER
+
+
+# ---------------------------------------------------------------------------
+# Main event loop — stdin mode (for embedded/pipe use)
+# ---------------------------------------------------------------------------
+
+async def main_stdin():
     """Read YAML requests from stdin, dispatch to handlers."""
     _platform = "macOS/CoreBluetooth" if IS_MACOS else "Linux/BlueZ" if IS_LINUX else platform.system()
-    _log(f"caeruleus-server starting... (platform={_platform}, adapter={_adapter})")
-    _send_response({"id": 0, "status": "ok", "result": {"ready": True, "adapter": _adapter}})
+    _log(f"caeruleus-server starting in stdin mode... (platform={_platform}, adapter={_adapter})")
+
+    sys.stdout.write(_write_yaml_response(
+        {"id": 0, "status": "ok", "result": {"ready": True, "adapter": _adapter}}
+    ))
+    sys.stdout.flush()
 
     buffer = ""
     loop = asyncio.get_event_loop()
+
+    shutdown_event = asyncio.Event()
+    for sig in (signal.SIGTERM, signal.SIGINT):
+        loop.add_signal_handler(sig, shutdown_event.set)
+    signal.signal(signal.SIGPIPE, signal.SIG_IGN)
 
     reader = asyncio.StreamReader()
     protocol = asyncio.StreamReaderProtocol(reader)
     await loop.connect_read_pipe(lambda: protocol, sys.stdin)
 
-    while True:
-        try:
-            chunk = await reader.read(4096)
+    try:
+        while not shutdown_event.is_set():
+            try:
+                chunk = await asyncio.wait_for(reader.read(4096), timeout=1.0)
+            except asyncio.TimeoutError:
+                continue
             if not chunk:
-                break  # EOF
+                break
 
             buffer += chunk.decode("utf-8", errors="replace")
 
@@ -1016,7 +1104,6 @@ async def main():
                 pos = buffer.index(DELIMITER)
                 yaml_text = buffer[:pos]
                 buffer = buffer[pos + len(DELIMITER):]
-
                 if not yaml_text.strip():
                     continue
 
@@ -1026,74 +1113,126 @@ async def main():
                     _log(f"YAML parse error: {e}")
                     continue
 
-                request_id = request.get("id", 0)
-                command = request.get("command", "")
-                params = request.get("params", {})
+                response = await _dispatch_command(request)
+                sys.stdout.write(_write_yaml_response(response))
+                sys.stdout.flush()
 
-                handler = COMMANDS.get(command)
-                if handler is None:
-                    _send_error(
-                        request_id,
-                        "UNKNOWN_COMMAND",
-                        f"Unknown command: {command}",
-                        suggestion=f"Available: {', '.join(sorted(COMMANDS.keys()))}",
-                    )
-                    continue
-
-                try:
-                    result = await handler(params)
-                    _send_ok(request_id, result)
-                except Exception as e:
-                    _log(f"Command {command} error: {e}")
-                    _log(traceback.format_exc())
-
-                    code = "UNKNOWN"
-                    recoverable = False
-                    err_str = str(e).lower()
-
-                    if "not connected" in err_str or "disconnect" in err_str:
-                        code = "CONNECTION_LOST"
-                        recoverable = True
-                    elif "not found" in err_str:
-                        code = "DEVICE_NOT_FOUND"
-                        recoverable = True
-                    elif "permission" in err_str or "not permitted" in err_str:
-                        code = "PERMISSION_DENIED"
-                    elif "timeout" in err_str:
-                        code = "TIMEOUT"
-                        recoverable = True
-                    elif "pair" in err_str:
-                        code = "PAIRING_FAILED"
-                    elif "encrypt" in err_str or "auth" in err_str:
-                        code = "ENCRYPTION_ERROR"
-
-                    _send_error(request_id, code, str(e), recoverable=recoverable)
-
-                if command == "shutdown":
+                if request.get("command") == "shutdown":
                     return
 
-        except Exception as e:
-            _log(f"Main loop error: {e}")
-            _log(traceback.format_exc())
-            break
+    except Exception as e:
+        _log(f"Main loop error: {e}")
+        _log(traceback.format_exc())
+    finally:
+        await _cleanup_ble()
 
-    # Graceful cleanup on exit
-    _log("stdin closed, shutting down...")
-    if _client is not None:
+
+# ---------------------------------------------------------------------------
+# Main event loop — Unix socket mode (persistent server)
+# ---------------------------------------------------------------------------
+
+async def main_socket():
+    """Run persistent server on Unix domain socket.
+
+    Multiple clients can connect sequentially.  The BLE connection and all
+    server state persist across client connects/disconnects.
+    """
+    _platform = "macOS/CoreBluetooth" if IS_MACOS else "Linux/BlueZ" if IS_LINUX else platform.system()
+    _log(f"caeruleus-server starting in socket mode... (platform={_platform}, adapter={_adapter})")
+
+    # Clean up stale socket file (check if another server is running first)
+    if os.path.exists(SOCKET_PATH):
         try:
-            await _client.disconnect()
-        except Exception:
-            pass
+            r, w = await asyncio.open_unix_connection(SOCKET_PATH)
+            w.close()
+            await w.wait_closed()
+            _log(f"Another server already running on {SOCKET_PATH}")
+            sys.exit(1)
+        except (ConnectionRefusedError, FileNotFoundError, OSError):
+            os.unlink(SOCKET_PATH)
 
+    loop = asyncio.get_event_loop()
+    shutdown_event = asyncio.Event()
+    for sig in (signal.SIGTERM, signal.SIGINT):
+        loop.add_signal_handler(sig, shutdown_event.set)
+    signal.signal(signal.SIGPIPE, signal.SIG_IGN)
 
-if __name__ == "__main__":
-    signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
-    signal.signal(signal.SIGINT, lambda *_: sys.exit(0))
-    signal.signal(signal.SIGPIPE, lambda *_: sys.exit(0))
+    async def handle_client(
+        reader: asyncio.StreamReader, writer: asyncio.StreamWriter,
+    ):
+        peer = writer.get_extra_info("peername")
+        _log(f"Client connected: {peer}")
+        buffer = ""
+        try:
+            while not shutdown_event.is_set():
+                try:
+                    chunk = await asyncio.wait_for(reader.read(4096), timeout=1.0)
+                except asyncio.TimeoutError:
+                    continue
+                if not chunk:
+                    break
+
+                buffer += chunk.decode("utf-8", errors="replace")
+
+                while DELIMITER in buffer:
+                    pos = buffer.index(DELIMITER)
+                    yaml_text = buffer[:pos]
+                    buffer = buffer[pos + len(DELIMITER):]
+                    if not yaml_text.strip():
+                        continue
+
+                    try:
+                        request = yaml.safe_load(yaml_text)
+                    except yaml.YAMLError as e:
+                        _log(f"YAML parse error: {e}")
+                        continue
+
+                    response = await _dispatch_command(request)
+                    writer.write(_write_yaml_response(response).encode())
+                    await writer.drain()
+
+                    if request.get("command") == "shutdown":
+                        shutdown_event.set()
+                        return
+        except Exception as e:
+            _log(f"Client handler error: {e}")
+        finally:
+            writer.close()
+            try:
+                await writer.wait_closed()
+            except Exception:
+                pass
+            _log(f"Client disconnected: {peer}")
+
+    server = await asyncio.start_unix_server(handle_client, path=SOCKET_PATH)
+    _log(f"Listening on {SOCKET_PATH}")
+
+    # Write PID file so clients can detect a running server
+    pid_path = SOCKET_PATH + ".pid"
+    with open(pid_path, "w") as f:
+        f.write(str(os.getpid()))
 
     try:
-        asyncio.run(main())
+        await shutdown_event.wait()
+    finally:
+        server.close()
+        await server.wait_closed()
+        for path in (SOCKET_PATH, pid_path):
+            if os.path.exists(path):
+                os.unlink(path)
+        await _cleanup_ble()
+
+
+# ---------------------------------------------------------------------------
+# Entry point
+# ---------------------------------------------------------------------------
+
+if __name__ == "__main__":
+    mode = "socket" if "--socket" in sys.argv else "stdin"
+    entry = main_socket if mode == "socket" else main_stdin
+    try:
+        asyncio.run(entry())
     except KeyboardInterrupt:
         pass
     finally:
-        _log("caeruleus-server shutting down")
+        _log("caeruleus-server exited")
