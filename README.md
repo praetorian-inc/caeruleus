@@ -1,5 +1,7 @@
 # Caeruleus
 
+NOTE: VERY EARLY STATE, SEVERAL FEATURES STILL UNTESTED. TALK TO AARON BEFORE USE
+
 Caeruleus is a BLE security testing toolkit implemented as a [Claude Code](https://docs.anthropic.com/en/docs/claude-code) skill plugin — TypeScript scripts backed by a persistent Python server ([bleak](https://bleak.readthedocs.io/)) cover the full assessment lifecycle: recon, analysis, attack, and reporting. An AI agent orchestrates the tools against a target device through a shared YAML IPC client.
 
 *caeruleus* — Latin for "blue"
