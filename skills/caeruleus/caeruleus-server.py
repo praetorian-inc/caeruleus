@@ -84,22 +84,31 @@ async def _ensure_connected(mac: Optional[str] = None) -> Any:
             pass
 
     from bleak import BleakClient, BleakScanner
+    from bleak.exc import BleakDeviceNotFoundError
 
     _log(f"Connecting to {target}...")
-
-    # On macOS, CoreBluetooth requires the device to be discovered before connecting.
-    # Do a quick scan to populate the system cache if needed.
-    if IS_MACOS:
-        _log(f"Quick scan to discover {target}...")
-        device = await BleakScanner.find_device_by_address(target, timeout=5.0)
-        if device is None:
-            raise ValueError(f"Device {target} not found during pre-connect scan")
 
     client_kwargs: dict[str, Any] = {"timeout": 15.0}
     if IS_LINUX:
         client_kwargs["adapter"] = _adapter
+
+    # Try connecting directly first (CoreBluetooth may have device cached).
+    # If that fails on macOS with BleakDeviceNotFoundError, do a full scan
+    # and pass the BLEDevice object directly — the most reliable macOS pattern.
     _client = BleakClient(target, **client_kwargs)
-    await _client.connect()
+    try:
+        await _client.connect()
+    except BleakDeviceNotFoundError:
+        if not IS_MACOS:
+            raise
+        _log(f"Device not cached, running discovery scan for {target}...")
+        devices = await BleakScanner.discover(timeout=10.0)
+        device = next((d for d in devices if d.address == target), None)
+        if device is None:
+            raise ValueError(f"Device {target} not found during discovery scan")
+        _client = BleakClient(device, **client_kwargs)
+        await _client.connect()
+
     _connected_mac = target
     _gatt_cache = None  # Invalidate cache on new connection
     _log(f"Connected to {target}")
@@ -233,6 +242,7 @@ async def cmd_connect(params: dict) -> dict:
     timeout = params.get("timeout", 15)
 
     from bleak import BleakClient, BleakScanner
+    from bleak.exc import BleakDeviceNotFoundError
 
     global _client, _connected_mac, _gatt_cache
     if _client is not None:
@@ -241,21 +251,30 @@ async def cmd_connect(params: dict) -> dict:
         except Exception:
             pass
 
-    # On macOS, CoreBluetooth requires the device to be discovered before connecting.
-    if IS_MACOS:
-        _log(f"Quick scan to discover {mac}...")
-        device = await BleakScanner.find_device_by_address(mac, timeout=5.0)
-        if device is None:
-            raise ValueError(f"Device {mac} not found during pre-connect scan")
-
     def _on_disconnect(client):
         _log(f"Disconnected from {mac}")
 
     client_kwargs: dict[str, Any] = {"timeout": timeout, "disconnected_callback": _on_disconnect}
     if IS_LINUX:
         client_kwargs["adapter"] = _adapter
+
+    # Try connecting directly first (CoreBluetooth may have device cached).
+    # If that fails on macOS with BleakDeviceNotFoundError, do a full scan
+    # and pass the BLEDevice object directly — the most reliable macOS pattern.
     _client = BleakClient(mac, **client_kwargs)
-    await _client.connect()
+    try:
+        await _client.connect()
+    except BleakDeviceNotFoundError:
+        if not IS_MACOS:
+            raise
+        _log(f"Device not cached, running discovery scan for {mac}...")
+        devices = await BleakScanner.discover(timeout=10.0)
+        device = next((d for d in devices if d.address == mac), None)
+        if device is None:
+            raise ValueError(f"Device {mac} not found during discovery scan")
+        _client = BleakClient(device, **client_kwargs)
+        await _client.connect()
+
     _connected_mac = mac
     _gatt_cache = None
     _log(f"Connected to {mac}")
