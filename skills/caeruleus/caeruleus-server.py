@@ -60,6 +60,8 @@ _notification_buffer: dict[str, list] = {}  # uuid -> [notifications]
 _pairing_state: Optional[str] = None
 _adapter: str = os.environ.get("CAERULEUS_ADAPTER", "hci0")
 
+IDLE_TIMEOUT_S = int(os.environ.get("CAERULEUS_IDLE_TIMEOUT", 1800))  # 30 min default
+
 
 def _is_connected() -> bool:
     return _client is not None and _client.is_connected
@@ -1360,11 +1362,29 @@ async def main_socket():
         loop.add_signal_handler(sig, shutdown_event.set)
     signal.signal(signal.SIGPIPE, signal.SIG_IGN)
 
+    import time
+    _last_activity = time.monotonic()
+
+    def _touch_activity():
+        nonlocal _last_activity
+        _last_activity = time.monotonic()
+
+    async def _idle_watchdog():
+        """Terminate server after IDLE_TIMEOUT_S seconds of inactivity."""
+        while not shutdown_event.is_set():
+            await asyncio.sleep(60)  # check every minute
+            elapsed = time.monotonic() - _last_activity
+            if elapsed >= IDLE_TIMEOUT_S:
+                _log(f"Idle timeout ({IDLE_TIMEOUT_S}s) reached — shutting down")
+                shutdown_event.set()
+                return
+
     async def handle_client(
         reader: asyncio.StreamReader, writer: asyncio.StreamWriter,
     ):
         peer = writer.get_extra_info("peername")
         _log(f"Client connected: {peer}")
+        _touch_activity()
         buffer = ""
         try:
             while not shutdown_event.is_set():
@@ -1390,6 +1410,7 @@ async def main_socket():
                         _log(f"YAML parse error: {e}")
                         continue
 
+                    _touch_activity()
                     response = await _dispatch_command(request)
                     writer.write(_write_yaml_response(response).encode())
                     await writer.drain()
@@ -1408,16 +1429,19 @@ async def main_socket():
             _log(f"Client disconnected: {peer}")
 
     server = await asyncio.start_unix_server(handle_client, path=SOCKET_PATH)
-    _log(f"Listening on {SOCKET_PATH}")
+    _log(f"Listening on {SOCKET_PATH} (idle timeout={IDLE_TIMEOUT_S}s)")
 
     # Write PID file so clients can detect a running server
     pid_path = SOCKET_PATH + ".pid"
     with open(pid_path, "w") as f:
         f.write(str(os.getpid()))
 
+    watchdog_task = asyncio.create_task(_idle_watchdog())
+
     try:
         await shutdown_event.wait()
     finally:
+        watchdog_task.cancel()
         server.close()
         await server.wait_closed()
         for path in (SOCKET_PATH, pid_path):
