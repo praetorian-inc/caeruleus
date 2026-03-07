@@ -50,6 +50,15 @@ export const subscribeNotifications = {
     // Ensure connected
     await callFn('connect', { mac_address: validated.mac_address });
 
+    // Warn on macOS — CoreBluetooth cannot enable notifications when the
+    // remote device lacks CCCD descriptors (common in CTF / non-compliant firmware).
+    const isMacOS = process.platform === 'darwin';
+    const macosWarning = isMacOS
+      ? 'WARNING: Running on macOS/CoreBluetooth. Notification/indication '
+        + 'subscriptions may fail if the remote device lacks CCCD descriptors '
+        + '(0x2902). For full compatibility, use Linux/BlueZ.'
+      : null;
+
     // Determine which UUIDs to subscribe to
     let targetUuids = validated.uuids || [];
 
@@ -128,7 +137,7 @@ export const subscribeNotifications = {
       }
     }
 
-    const result = {
+    const result: Record<string, unknown> = {
       duration_seconds: validated.duration,
       characteristics_monitored: targetUuids.length,
       captures,
@@ -137,6 +146,7 @@ export const subscribeNotifications = {
         (sum, c) => sum + ((c.notification_count as number) || 0),
         0,
       ),
+      ...(macosWarning ? { platform_warning: macosWarning } : {}),
       estimatedTokens: 0,
     };
 

@@ -490,6 +490,33 @@ async def cmd_read_characteristic(params: dict) -> dict:
     if not uuid:
         raise ValueError("uuid is required")
 
+    # macOS/CoreBluetooth hides GAP service (0x1800) from applications.
+    # Fall back to advertisement/peripheral name for Device Name (0x2A00).
+    GAP_DEVICE_NAME = "00002a00-0000-1000-8000-00805f9b34fb"
+    if uuid.lower().replace("-", "") == GAP_DEVICE_NAME.lower().replace("-", ""):
+        char = client.services.get_characteristic(uuid)
+        if char is None and IS_MACOS:
+            _log("0x2A00 not in service tree (macOS hides GAP). "
+                 "Falling back to peripheral name.")
+            # On macOS, bleak exposes the name from CoreBluetooth's peripheral
+            name = getattr(client, '_device_info', {}).get('name', '')
+            if not name:
+                # Try the backend peripheral's name directly
+                try:
+                    name = client._backend._peripheral.name() or ''
+                except Exception:
+                    name = ''
+            if not name:
+                name = _connected_mac or 'unknown'
+            raw = name.encode('utf-8')
+            return {
+                "uuid": uuid,
+                "raw_hex": raw.hex(),
+                "decoded": name,
+                "length": len(raw),
+                "note": "Read via CoreBluetooth peripheral name (GAP service hidden on macOS)",
+            }
+
     raw = await client.read_gatt_char(uuid)
     return {
         "uuid": uuid,
@@ -533,6 +560,88 @@ async def cmd_write_no_response(params: dict) -> dict:
     return {"uuid": uuid, "written_hex": value_hex, "length": len(data)}
 
 
+@register("read_handle")
+async def cmd_read_handle(params: dict) -> dict:
+    """Read from a raw ATT handle (characteristic value or descriptor)."""
+    client = await _ensure_connected(params.get("mac_address"))
+    handle = int(params.get("handle", 0))
+
+    if not handle:
+        raise ValueError("handle (integer) is required")
+
+    # Try as characteristic (bleak indexes by declaration handle)
+    for service in client.services:
+        for char in service.characteristics:
+            # Value handle is declaration handle + 1
+            if char.handle == handle or (char.handle + 1) == handle:
+                data = await client.read_gatt_char(char)
+                return {
+                    "handle": handle,
+                    "type": "characteristic",
+                    "uuid": str(char.uuid),
+                    "raw_hex": data.hex(),
+                    "decoded": _try_decode(data),
+                    "length": len(data),
+                }
+            for desc in char.descriptors:
+                if desc.handle == handle:
+                    data = await client.read_gatt_descriptor(desc)
+                    return {
+                        "handle": handle,
+                        "type": "descriptor",
+                        "uuid": str(desc.uuid),
+                        "raw_hex": data.hex(),
+                        "decoded": _try_decode(data),
+                        "length": len(data),
+                    }
+
+    raise ValueError(
+        f"Handle {handle} (0x{handle:04X}) not found in discovered GATT attributes. "
+        f"Only handles present in the service tree can be accessed."
+    )
+
+
+@register("write_handle")
+async def cmd_write_handle(params: dict) -> dict:
+    """Write to a raw ATT handle (characteristic value or descriptor)."""
+    client = await _ensure_connected(params.get("mac_address"))
+    handle = int(params.get("handle", 0))
+    value_hex = params.get("value_hex", "")
+
+    if not handle:
+        raise ValueError("handle (integer) is required")
+
+    data = bytes.fromhex(value_hex)
+
+    # Try as characteristic
+    for service in client.services:
+        for char in service.characteristics:
+            if char.handle == handle or (char.handle + 1) == handle:
+                await client.write_gatt_char(char, data, response=True)
+                return {
+                    "handle": handle,
+                    "type": "characteristic",
+                    "uuid": str(char.uuid),
+                    "written_hex": value_hex,
+                    "length": len(data),
+                }
+            for desc in char.descriptors:
+                if desc.handle == handle:
+                    await client.write_gatt_descriptor(desc, data)
+                    return {
+                        "handle": handle,
+                        "type": "descriptor",
+                        "uuid": str(desc.uuid),
+                        "written_hex": value_hex,
+                        "length": len(data),
+                    }
+
+    raise ValueError(
+        f"Handle {handle} (0x{handle:04X}) not found in discovered GATT attributes. "
+        f"Only handles present in the service tree can be accessed."
+    )
+
+
 @register("subscribe")
 async def cmd_subscribe(params: dict) -> dict:
     client = await _ensure_connected(params.get("mac_address"))
@@ -552,10 +661,58 @@ async def cmd_subscribe(params: dict) -> dict:
             "length": len(data),
         })
 
-    await client.start_notify(uuid, _notification_handler)
+    subscribed = False
+
+    # Attempt 1: standard start_notify
+    try:
+        await client.start_notify(uuid, _notification_handler)
+        subscribed = True
+    except Exception as e:
+        _log(f"start_notify failed for {uuid}: {e}")
+
+    # Attempt 2 (macOS): reconnect to clear CoreBluetooth GATT cache, retry
+    if not subscribed and IS_MACOS:
+        _log("Reconnecting to refresh CoreBluetooth GATT cache...")
+        try:
+            global _client, _gatt_cache
+            mac = _connected_mac
+            await _client.disconnect()
+            _client = None
+            _gatt_cache = None
+            await asyncio.sleep(1)
+            client = await _ensure_connected(mac)
+            await client.start_notify(uuid, _notification_handler)
+            subscribed = True
+            _log(f"start_notify succeeded after reconnect for {uuid}")
+        except Exception as e:
+            _log(f"start_notify still failed after reconnect: {e}")
+
+    # Attempt 3: manual CCCD enable via descriptor write
+    if not subscribed:
+        subscribed = await _try_manual_cccd_enable(client, uuid, _notification_handler)
+
+    if not subscribed:
+        _notification_buffer.pop(uuid, None)
+        platform_hint = (
+            "On macOS/CoreBluetooth, this happens when the remote device lacks "
+            "CCCD descriptors (0x2902). CoreBluetooth cannot enable notifications "
+            "without a discoverable CCCD. Use Linux/BlueZ for raw ATT handle access."
+        ) if IS_MACOS else (
+            "Manual CCCD enable also failed. The device may not support "
+            "notifications on this characteristic."
+        )
+        raise ValueError(
+            f"Cannot subscribe to {uuid}: all notification enable strategies "
+            f"failed. {platform_hint}"
+        )
+
     _log(f"Subscribed to {uuid}, collecting for {duration}s...")
     await asyncio.sleep(duration)
-    await client.stop_notify(uuid)
+
+    try:
+        await client.stop_notify(uuid)
+    except Exception:
+        pass
 
     notifications = _notification_buffer.pop(uuid, [])
     return {
@@ -564,6 +721,52 @@ async def cmd_subscribe(params: dict) -> dict:
         "notification_count": len(notifications),
         "notifications": notifications,
     }
+
+
+async def _try_manual_cccd_enable(client, uuid: str, callback) -> bool:
+    """Try to enable notifications by manually writing to the CCCD descriptor."""
+    char = client.services.get_characteristic(uuid)
+    if not char:
+        _log(f"Characteristic {uuid} not found in service tree")
+        return False
+
+    props = char.properties
+    is_indicate = "indicate" in props
+    cccd_value = b'\x02\x00' if is_indicate and "notify" not in props else b'\x01\x00'
+
+    # Strategy A: check for existing CCCD descriptor in bleak's tree
+    for desc in char.descriptors:
+        if "2902" in str(desc.uuid).lower():
+            try:
+                await client.write_gatt_descriptor(desc, cccd_value)
+                _log(f"Manual CCCD write succeeded via discovered descriptor "
+                     f"at handle {desc.handle}")
+                return True
+            except Exception as e:
+                _log(f"CCCD descriptor write failed: {e}")
+
+    # Strategy B: try computed CCCD handle (value_handle + 1 = declaration + 2)
+    cccd_handle = char.handle + 2
+    _log(f"No CCCD in descriptor list. Trying computed handle "
+         f"{cccd_handle} (0x{cccd_handle:04X})...")
+
+    # Check if this handle is already claimed by another attribute
+    for service in client.services:
+        for c in service.characteristics:
+            if c.handle == cccd_handle:
+                _log(f"Handle {cccd_handle} is another characteristic declaration, "
+                     f"not a CCCD — skipping")
+                return False
+
+    # Try writing CCCD value to computed handle as descriptor
+    try:
+        await client.write_gatt_descriptor(cccd_handle, cccd_value)
+        _log(f"Manual CCCD write to handle {cccd_handle} succeeded")
+        return True
+    except Exception as e:
+        _log(f"Manual CCCD write to handle {cccd_handle} failed: {e}")
+
+    return False
 
 
 @register("unsubscribe")
