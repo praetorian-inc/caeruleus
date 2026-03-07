@@ -100,11 +100,14 @@ async def _ensure_connected(mac: Optional[str] = None) -> Any:
     _client = BleakClient(target, **client_kwargs)
     try:
         await _client.connect()
-    except BleakDeviceNotFoundError:
-        if not IS_MACOS:
+    except (BleakDeviceNotFoundError, Exception) as e:
+        if not isinstance(e, BleakDeviceNotFoundError) and "not found" not in str(e).lower():
             raise
         _log(f"Device not cached, running discovery scan for {target}...")
-        devices = await BleakScanner.discover(timeout=10.0)
+        scanner_kwargs: dict[str, Any] = {"timeout": 10.0}
+        if IS_LINUX:
+            scanner_kwargs["adapter"] = _adapter
+        devices = await BleakScanner.discover(**scanner_kwargs)
         device = next((d for d in devices if d.address == target), None)
         if device is None:
             raise ValueError(f"Device {target} not found during discovery scan")
@@ -266,11 +269,14 @@ async def cmd_connect(params: dict) -> dict:
     _client = BleakClient(mac, **client_kwargs)
     try:
         await _client.connect()
-    except BleakDeviceNotFoundError:
-        if not IS_MACOS:
+    except (BleakDeviceNotFoundError, Exception) as e:
+        if not isinstance(e, BleakDeviceNotFoundError) and "not found" not in str(e).lower():
             raise
         _log(f"Device not cached, running discovery scan for {mac}...")
-        devices = await BleakScanner.discover(timeout=10.0)
+        scan_kwargs: dict[str, Any] = {"timeout": 10.0}
+        if IS_LINUX:
+            scan_kwargs["adapter"] = _adapter
+        devices = await BleakScanner.discover(**scan_kwargs)
         device = next((d for d in devices if d.address == mac), None)
         if device is None:
             raise ValueError(f"Device {mac} not found during discovery scan")
@@ -664,17 +670,26 @@ async def cmd_subscribe(params: dict) -> dict:
         })
 
     subscribed = False
+    subscribe_errors = []
+
+    # Attempt 0: release any stale notify session
+    try:
+        await client.stop_notify(uuid)
+        _log(f"Released stale notify session for {uuid}")
+    except Exception:
+        pass
 
     # Attempt 1: standard start_notify
     try:
         await client.start_notify(uuid, _notification_handler)
         subscribed = True
     except Exception as e:
+        subscribe_errors.append(f"start_notify: {e}")
         _log(f"start_notify failed for {uuid}: {e}")
 
-    # Attempt 2 (macOS): reconnect to clear CoreBluetooth GATT cache, retry
-    if not subscribed and IS_MACOS:
-        _log("Reconnecting to refresh CoreBluetooth GATT cache...")
+    # Attempt 2: reconnect to clear stale notify state, retry
+    if not subscribed:
+        _log("Reconnecting to clear stale notify state...")
         try:
             global _client, _gatt_cache
             mac = _connected_mac
@@ -693,19 +708,28 @@ async def cmd_subscribe(params: dict) -> dict:
     if not subscribed:
         subscribed = await _try_manual_cccd_enable(client, uuid, _notification_handler)
 
+    # Attempt 4 (Linux): fall back to raw L2CAP ATT socket
+    if not subscribed and IS_LINUX:
+        _log(f"Falling back to subscribe_raw (L2CAP ATT) for {uuid}")
+        _notification_buffer.pop(uuid, None)
+        return await cmd_subscribe_raw({
+            "mac_address": _connected_mac,
+            "uuid": uuid,
+            "duration": duration,
+            "write_handle": params.get("write_handle"),
+            "write_value_hex": params.get("write_value_hex"),
+        })
+
     if not subscribed:
         _notification_buffer.pop(uuid, None)
         platform_hint = (
             "On macOS/CoreBluetooth, this happens when the remote device lacks "
             "CCCD descriptors (0x2902). CoreBluetooth cannot enable notifications "
             "without a discoverable CCCD. Use Linux/BlueZ for raw ATT handle access."
-        ) if IS_MACOS else (
-            "Manual CCCD enable also failed. The device may not support "
-            "notifications on this characteristic."
         )
         raise ValueError(
             f"Cannot subscribe to {uuid}: all notification enable strategies "
-            f"failed. {platform_hint}"
+            f"failed. {platform_hint} Errors: {'; '.join(subscribe_errors)}"
         )
 
     _log(f"Subscribed to {uuid}, collecting for {duration}s...")
@@ -753,22 +777,411 @@ async def _try_manual_cccd_enable(client, uuid: str, callback) -> bool:
          f"{cccd_handle} (0x{cccd_handle:04X})...")
 
     # Check if this handle is already claimed by another attribute
+    handle_collision = False
     for service in client.services:
         for c in service.characteristics:
             if c.handle == cccd_handle:
-                _log(f"Handle {cccd_handle} is another characteristic declaration, "
-                     f"not a CCCD — skipping")
-                return False
+                handle_collision = True
+                _log(f"Handle {cccd_handle} is another characteristic declaration — "
+                     f"attempting CCCD write anyway (CTF/non-standard device)")
 
     # Try writing CCCD value to computed handle as descriptor
     try:
         await client.write_gatt_descriptor(cccd_handle, cccd_value)
-        _log(f"Manual CCCD write to handle {cccd_handle} succeeded")
+        _log(f"Manual CCCD write to handle {cccd_handle} succeeded"
+             f"{' (despite handle collision)' if handle_collision else ''}")
         return True
     except Exception as e:
         _log(f"Manual CCCD write to handle {cccd_handle} failed: {e}")
 
     return False
+
+
+@register("subscribe_raw")
+async def cmd_subscribe_raw(params: dict) -> dict:
+    """Subscribe to notifications via raw L2CAP ATT socket.
+
+    Bypasses BlueZ D-Bus entirely — opens a direct ATT channel to the
+    device, optionally writes a trigger value, and captures ATT Handle
+    Value Notification (opcode 0x1B) and Indication (0x1D) PDUs.
+
+    This is the Python equivalent of:
+      gatttool -b <mac> -a <handle> --char-write-req -n <value> --listen
+
+    Required on devices that lack CCCD descriptors (common in CTF boards
+    and some IoT firmware) where Bleak's start_notify fails.
+    """
+    import struct
+    import socket as sock_mod
+    import ctypes
+    import ctypes.util
+    global _client, _connected_mac, _gatt_cache
+
+    if not IS_LINUX:
+        raise ValueError("subscribe_raw requires Linux/BlueZ")
+
+    mac = params.get("mac_address") or _connected_mac
+    uuid = params.get("uuid")
+    duration = params.get("duration", 30)
+    write_value_hex = params.get("write_value_hex")
+
+    if not mac:
+        raise ValueError("mac_address is required")
+
+    # Resolve the value handle from UUID via the active Bleak connection
+    value_handle = params.get("write_handle")
+    if uuid and _client and _client.is_connected:
+        char = _client.services.get_characteristic(uuid)
+        if char and value_handle is None:
+            value_handle = char.handle + 1  # value handle = declaration + 1
+
+    if value_handle is None:
+        raise ValueError("Could not resolve value handle — provide write_handle or uuid")
+    value_handle = int(value_handle)
+
+    # Disconnect Bleak so we can open a raw ATT socket (one connection at a time)
+    if _client and _client.is_connected:
+        await _client.disconnect()
+    _client = None
+    _gatt_cache = None
+
+    _log(f"subscribe_raw: opening L2CAP ATT socket to {mac}, "
+         f"value_handle=0x{value_handle:04x}, duration={duration}s")
+
+    # ATT/L2CAP constants
+    AF_BLUETOOTH = 31
+    ATT_CID = 4
+    BDADDR_LE_PUBLIC = 1
+    ATT_OP_WRITE_REQ = 0x12
+    ATT_OP_WRITE_RESP = 0x13
+    ATT_OP_NOTIFICATION = 0x1B
+    ATT_OP_INDICATION = 0x1D
+    ATT_OP_CONFIRM = 0x1E
+
+    notifications: list[dict] = []
+    loop = asyncio.get_event_loop()
+
+    # Open raw L2CAP ATT socket with ctypes for BLE-specific sockaddr_l2
+    libc = ctypes.CDLL(ctypes.util.find_library("c"), use_errno=True)
+    raw = sock_mod.socket(sock_mod.AF_BLUETOOTH, sock_mod.SOCK_SEQPACKET,
+                          sock_mod.BTPROTO_L2CAP)
+    raw.setblocking(False)
+    fd = raw.fileno()
+
+    try:
+        # Bind with CID=4 (ATT) using packed sockaddr_l2
+        local_addr = struct.pack("<HH6sHBx", AF_BLUETOOTH, 0,
+                                 b"\x00" * 6, ATT_CID, 0)
+        ret = libc.bind(fd, local_addr, len(local_addr))
+        if ret != 0:
+            raise OSError(ctypes.get_errno(),
+                          f"L2CAP bind failed: {os.strerror(ctypes.get_errno())}")
+
+        # Connect with BLE address type
+        mac_bytes = bytes(reversed(bytes.fromhex(mac.replace(":", ""))))
+        remote_addr = struct.pack("<HH6sHBx", AF_BLUETOOTH, 0,
+                                  mac_bytes, ATT_CID, BDADDR_LE_PUBLIC)
+        ret = libc.connect(fd, remote_addr, len(remote_addr))
+        errno_val = ctypes.get_errno()
+
+        if ret == -1 and errno_val == 115:  # EINPROGRESS
+            connect_event = asyncio.Event()
+            loop.add_writer(fd, connect_event.set)
+            try:
+                await asyncio.wait_for(connect_event.wait(), timeout=15.0)
+            finally:
+                loop.remove_writer(fd)
+            err = raw.getsockopt(sock_mod.SOL_SOCKET, sock_mod.SO_ERROR)
+            if err:
+                raise OSError(err, f"L2CAP connect failed: {os.strerror(err)}")
+        elif ret != 0:
+            raise OSError(errno_val, f"L2CAP connect failed: {os.strerror(errno_val)}")
+
+        _log("subscribe_raw: ATT socket connected")
+
+        # Write trigger value if provided
+        if write_value_hex:
+            write_data = bytes.fromhex(write_value_hex)
+            att_write = (bytes([ATT_OP_WRITE_REQ])
+                         + struct.pack("<H", value_handle)
+                         + write_data)
+            raw.send(att_write)
+            _log(f"subscribe_raw: sent ATT Write Request to 0x{value_handle:04x}")
+
+        # Listen for notifications/indications
+        done = asyncio.Event()
+
+        def _on_att_data():
+            try:
+                data = raw.recv(512)
+                if not data:
+                    done.set()
+                    return
+                opcode = data[0]
+                if opcode in (ATT_OP_NOTIFICATION, ATT_OP_INDICATION):
+                    handle = struct.unpack("<H", data[1:3])[0]
+                    payload = data[3:]
+                    notifications.append({
+                        "timestamp": _utcnow_iso(),
+                        "handle": f"0x{handle:04x}",
+                        "type": "notification" if opcode == ATT_OP_NOTIFICATION else "indication",
+                        "raw_hex": payload.hex(),
+                        "decoded": _try_decode(payload),
+                        "length": len(payload),
+                    })
+                    if opcode == ATT_OP_INDICATION:
+                        raw.send(bytes([ATT_OP_CONFIRM]))
+                elif opcode == ATT_OP_WRITE_RESP:
+                    _log("subscribe_raw: received ATT Write Response")
+            except (OSError, BlockingIOError):
+                pass
+
+        loop.add_reader(fd, _on_att_data)
+        try:
+            await asyncio.wait_for(done.wait(), timeout=duration)
+        except asyncio.TimeoutError:
+            pass
+        finally:
+            loop.remove_reader(fd)
+
+    finally:
+        raw.close()
+
+    # Reconnect via Bleak for subsequent commands
+    _connected_mac = mac
+    try:
+        await _ensure_connected(mac)
+        _log("subscribe_raw: reconnected via Bleak")
+    except Exception as e:
+        _log(f"subscribe_raw: Bleak reconnect failed (non-fatal): {e}")
+
+    return {
+        "uuid": uuid,
+        "duration_seconds": duration,
+        "notification_count": len(notifications),
+        "notifications": notifications,
+        "method": "raw_l2cap_att",
+    }
+
+
+@register("raw_att")
+async def cmd_raw_att(params: dict) -> dict:
+    """Execute raw ATT operations via L2CAP socket.
+
+    Supports a sequence of ATT operations: exchange_mtu, read, write, listen.
+    Useful for operations that Bleak doesn't support (MTU negotiation,
+    reading handles not in GATT cache, etc.).
+    """
+    import struct
+    import socket as sock_mod
+    import ctypes
+    import ctypes.util
+    global _client, _connected_mac, _gatt_cache
+
+    if not IS_LINUX:
+        raise ValueError("raw_att requires Linux/BlueZ")
+
+    mac = params.get("mac_address") or _connected_mac
+    if not mac:
+        raise ValueError("mac_address is required")
+
+    operations = params.get("operations", [])
+    if not operations:
+        raise ValueError("operations list is required")
+
+    # Disconnect Bleak so we can open a raw ATT socket
+    if _client and _client.is_connected:
+        await _client.disconnect()
+    _client = None
+    _gatt_cache = None
+
+    AF_BLUETOOTH = 31
+    ATT_CID = 4
+    BDADDR_LE_PUBLIC = 1
+
+    results = []
+    loop = asyncio.get_event_loop()
+    libc = ctypes.CDLL(ctypes.util.find_library("c"), use_errno=True)
+    raw = sock_mod.socket(sock_mod.AF_BLUETOOTH, sock_mod.SOCK_SEQPACKET,
+                          sock_mod.BTPROTO_L2CAP)
+    raw.setblocking(False)
+    fd = raw.fileno()
+
+    try:
+        # Bind
+        local_addr = struct.pack("<HH6sHBx", AF_BLUETOOTH, 0,
+                                 b"\x00" * 6, ATT_CID, 0)
+        ret = libc.bind(fd, local_addr, len(local_addr))
+        if ret != 0:
+            raise OSError(ctypes.get_errno(),
+                          f"L2CAP bind failed: {os.strerror(ctypes.get_errno())}")
+
+        # Connect
+        mac_bytes = bytes(reversed(bytes.fromhex(mac.replace(":", ""))))
+        remote_addr = struct.pack("<HH6sHBx", AF_BLUETOOTH, 0,
+                                  mac_bytes, ATT_CID, BDADDR_LE_PUBLIC)
+        ret = libc.connect(fd, remote_addr, len(remote_addr))
+        errno_val = ctypes.get_errno()
+
+        if ret == -1 and errno_val == 115:  # EINPROGRESS
+            connect_event = asyncio.Event()
+            loop.add_writer(fd, connect_event.set)
+            try:
+                await asyncio.wait_for(connect_event.wait(), timeout=15.0)
+            finally:
+                loop.remove_writer(fd)
+            err = raw.getsockopt(sock_mod.SOL_SOCKET, sock_mod.SO_ERROR)
+            if err:
+                raise OSError(err, f"L2CAP connect failed: {os.strerror(err)}")
+        elif ret != 0:
+            raise OSError(errno_val, f"L2CAP connect failed: {os.strerror(errno_val)}")
+
+        _log("raw_att: ATT socket connected")
+
+        async def _recv_att(timeout_s: float = 5.0) -> bytes:
+            """Receive one ATT PDU with timeout."""
+            data_event = asyncio.Event()
+            received = []
+
+            def _on_data():
+                try:
+                    d = raw.recv(512)
+                    received.append(d)
+                    data_event.set()
+                except (OSError, BlockingIOError):
+                    pass
+
+            loop.add_reader(fd, _on_data)
+            try:
+                await asyncio.wait_for(data_event.wait(), timeout=timeout_s)
+                return received[0] if received else b''
+            except asyncio.TimeoutError:
+                return b''
+            finally:
+                loop.remove_reader(fd)
+
+        for op in operations:
+            op_type = op.get("type")
+
+            if op_type == "exchange_mtu":
+                mtu = int(op.get("mtu", 23))
+                att_pdu = bytes([0x02]) + struct.pack("<H", mtu)
+                raw.send(att_pdu)
+                resp = await _recv_att(5.0)
+                if resp and resp[0] == 0x03:
+                    server_mtu = struct.unpack("<H", resp[1:3])[0]
+                    results.append({
+                        "type": "exchange_mtu",
+                        "requested_mtu": mtu,
+                        "server_mtu": server_mtu,
+                        "negotiated_mtu": min(mtu, server_mtu),
+                    })
+                else:
+                    results.append({
+                        "type": "exchange_mtu",
+                        "error": f"Unexpected response: {resp.hex() if resp else 'timeout'}",
+                    })
+
+            elif op_type == "read":
+                handle = int(op.get("handle", 0))
+                att_pdu = bytes([0x0A]) + struct.pack("<H", handle)
+                raw.send(att_pdu)
+                resp = await _recv_att(5.0)
+                if resp and resp[0] == 0x0B:
+                    payload = resp[1:]
+                    results.append({
+                        "type": "read",
+                        "handle": f"0x{handle:04x}",
+                        "raw_hex": payload.hex(),
+                        "decoded": _try_decode(payload),
+                        "length": len(payload),
+                    })
+                elif resp and resp[0] == 0x01:  # Error Response
+                    results.append({
+                        "type": "read",
+                        "handle": f"0x{handle:04x}",
+                        "error": f"ATT error 0x{resp[4]:02x}" if len(resp) > 4 else "ATT error",
+                    })
+                else:
+                    results.append({
+                        "type": "read",
+                        "handle": f"0x{handle:04x}",
+                        "error": f"Unexpected: {resp.hex() if resp else 'timeout'}",
+                    })
+
+            elif op_type == "write":
+                handle = int(op.get("handle", 0))
+                value_hex = op.get("value_hex", "")
+                data = bytes.fromhex(value_hex)
+                att_pdu = bytes([0x12]) + struct.pack("<H", handle) + data
+                raw.send(att_pdu)
+                resp = await _recv_att(5.0)
+                if resp and resp[0] == 0x13:
+                    results.append({
+                        "type": "write",
+                        "handle": f"0x{handle:04x}",
+                        "success": True,
+                    })
+                else:
+                    results.append({
+                        "type": "write",
+                        "handle": f"0x{handle:04x}",
+                        "error": f"Unexpected: {resp.hex() if resp else 'timeout'}",
+                    })
+
+            elif op_type == "listen":
+                duration = float(op.get("duration", 10))
+                notifications = []
+                done = asyncio.Event()
+
+                def _on_notif():
+                    try:
+                        d = raw.recv(512)
+                        if not d:
+                            done.set()
+                            return
+                        opcode = d[0]
+                        if opcode in (0x1B, 0x1D):
+                            h = struct.unpack("<H", d[1:3])[0]
+                            payload = d[3:]
+                            notifications.append({
+                                "handle": f"0x{h:04x}",
+                                "type": "notification" if opcode == 0x1B else "indication",
+                                "raw_hex": payload.hex(),
+                                "decoded": _try_decode(payload),
+                            })
+                            if opcode == 0x1D:
+                                raw.send(bytes([0x1E]))
+                    except (OSError, BlockingIOError):
+                        pass
+
+                loop.add_reader(fd, _on_notif)
+                try:
+                    await asyncio.wait_for(done.wait(), timeout=duration)
+                except asyncio.TimeoutError:
+                    pass
+                finally:
+                    loop.remove_reader(fd)
+
+                results.append({
+                    "type": "listen",
+                    "duration": duration,
+                    "notifications": notifications,
+                    "count": len(notifications),
+                })
+
+    finally:
+        raw.close()
+
+    # Reconnect via Bleak
+    _connected_mac = mac
+    try:
+        await _ensure_connected(mac)
+        _log("raw_att: reconnected via Bleak")
+    except Exception as e:
+        _log(f"raw_att: Bleak reconnect failed (non-fatal): {e}")
+
+    return {"operations": results}
 
 
 @register("unsubscribe")

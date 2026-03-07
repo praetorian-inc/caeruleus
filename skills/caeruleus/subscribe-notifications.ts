@@ -19,6 +19,8 @@ export const subscribeNotificationsParams = z.object({
   gatt_map_path: z.string().optional(),
   uuids: z.array(z.string()).optional(),
   duration: z.number().min(1).max(3600).default(30),
+  write_handle: z.number().optional(),
+  write_value_hex: z.string().optional(),
 });
 export type SubscribeNotificationsInput = z.infer<typeof subscribeNotificationsParams>;
 
@@ -86,11 +88,19 @@ export const subscribeNotifications = {
 
     for (const uuid of targetUuids) {
       try {
-        const subResult = (await callFn('subscribe', {
+        const subParams: Record<string, unknown> = {
           mac_address: validated.mac_address,
           uuid,
           duration: validated.duration,
-        })) as Record<string, unknown>;
+          timeout_ms: (validated.duration + 60) * 1000,
+        };
+        if (validated.write_handle !== undefined) {
+          subParams.write_handle = validated.write_handle;
+        }
+        if (validated.write_value_hex !== undefined) {
+          subParams.write_value_hex = validated.write_value_hex;
+        }
+        const subResult = (await callFn('subscribe', subParams)) as Record<string, unknown>;
 
         const notifications = (subResult.notifications as Array<Record<string, unknown>>) || [];
 

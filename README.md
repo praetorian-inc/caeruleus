@@ -27,6 +27,13 @@ Optional:
 
 The Python server is **persistent** — it stays alive across multiple commands within a session, reusing the BLE connection. First call takes ~2-4s (adapter init + connection), subsequent calls ~50-200ms.
 
+### Raw ATT Operations (Linux only)
+
+Two server commands bypass Bleak's D-Bus layer to operate directly on L2CAP ATT sockets:
+
+- **`subscribe_raw`** — Opens a raw L2CAP ATT socket, optionally writes a trigger value (CCCD enable), and captures ATT Notification (0x1B) and Indication (0x1D) PDUs. Essential for devices that lack CCCD descriptors where Bleak's `start_notify` fails.
+- **`raw_att`** — General-purpose raw ATT operations: `exchange_mtu`, `read`, `write`, `listen`. Enables MTU negotiation and reading/writing handles not present in Bleak's GATT cache (e.g., GAP service attributes hidden by BlueZ).
+
 ## Skill Scripts
 
 ### Phase 1: Reconnaissance
@@ -88,6 +95,8 @@ The Python server is **persistent** — it stays alive across multiple commands 
 - **Python 3.10+** with dependencies: `pip install -r skills/caeruleus/requirements.txt`
 - **Node.js 20+** with dependencies: `cd skills/caeruleus && npm install`
 - **BLE adapter** — built-in Bluetooth on macOS, or USB HCI adapter on Linux
+- **Linux: BlueZ + Bluetooth service** — `sudo systemctl start bluetooth` (required for `hci0` adapter access)
+- **Linux: `AF_BLUETOOTH` socket permissions** — raw L2CAP ATT operations (`subscribe_raw`, `raw_att`) require `CAP_NET_RAW` or membership in the `bluetooth` group. Verify with: `python3 -c "import socket; socket.socket(31, 5, 0).close(); print('OK')"`
 
 ### Optional Hardware
 
