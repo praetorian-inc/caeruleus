@@ -121,10 +121,22 @@ npx tsx fuzz-characteristic.ts '{"mac_address": "AA:BB:CC:DD:EE:FF", "uuid": "2a
 
 ## Platform Support
 
+**Linux is required for full functionality.** macOS works for basic operations but has significant limitations due to CoreBluetooth's abstraction layer.
+
 | Platform | BLE Stack | Status |
 |---|---|---|
-| macOS | CoreBluetooth | Supported — uses UUID identifiers instead of MAC addresses |
-| Linux | BlueZ | Supported — requires `hci0` or configured adapter |
+| Linux | BlueZ | **Full support** — recommended for engagements |
+| macOS | CoreBluetooth | Partial — basic recon, reads, writes, and offline analysis work |
+
+### macOS Limitations
+
+CoreBluetooth abstracts the BLE stack and restricts low-level access:
+
+- **No notification/indication support for non-compliant devices** — CoreBluetooth requires CCCD descriptors (0x2902) to be discoverable. Devices that omit CCCDs (common in CTF boards and some IoT firmware) cannot have notifications enabled.
+- **GAP service hidden** — Generic Access (0x1800) and Generic Attribute (0x1801) services are managed internally by macOS and not exposed to applications. The Device Name characteristic (0x2A00) requires a platform-specific fallback.
+- **No MAC address control** — CoreBluetooth uses randomized UUIDs instead of real MAC addresses. MAC spoofing is not possible.
+- **No raw ATT handle writes** — only handles present in the discovered service tree can be accessed. Undiscovered handles (e.g., hidden CCCD descriptors) cannot be written to.
+- **GATT cache persistence** — CoreBluetooth caches GATT data across connections. A Bluetooth power cycle (`blueutil --power 0 && blueutil --power 1`) may be needed to clear stale data.
 
 ## Caeruleus-Target (Vulnerable DUT Firmware)
 
