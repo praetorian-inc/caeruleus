@@ -115,6 +115,10 @@ export class BleClient extends EventEmitter implements IBleClient {
         this.socket = socket;
         this.buffer = '';
 
+        // Allow Node.js to exit even if the socket is still open.
+        // The server runs as a detached process and persists independently.
+        socket.unref();
+
         socket.on('data', (data: Buffer) => {
           this.buffer += data.toString();
           this.processBuffer();
@@ -242,6 +246,7 @@ export class BleClient extends EventEmitter implements IBleClient {
           reject(new BleTimeoutError(params.command, timeoutMs));
         }
       }, timeoutMs);
+      timer.unref();
 
       this.pendingResponses.set(id, { resolve, reject, timer });
     });
