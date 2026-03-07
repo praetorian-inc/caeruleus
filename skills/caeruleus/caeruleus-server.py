@@ -1671,8 +1671,14 @@ async def _dispatch_command(request: dict) -> dict:
 
 
 async def _cleanup_ble():
-    """Disconnect BLE device if connected. Best-effort."""
+    """Disconnect BLE device if connected. Best-effort.
+
+    Uses Bleak disconnect first, then falls back to bluetoothctl to ensure
+    the BlueZ/kernel-level HCI connection is torn down even if Bleak is stuck
+    (e.g. mid-start_notify on a CCCD-less characteristic).
+    """
     global _client
+    mac = _connected_mac
     if _client is not None:
         _log("Disconnecting BLE device...")
         try:
@@ -1681,6 +1687,18 @@ async def _cleanup_ble():
         except Exception as e:
             _log(f"BLE disconnect error (best-effort): {e}")
         _client = None
+    # Fallback: ensure BlueZ kernel-level connection is torn down
+    if IS_LINUX and mac:
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                "bluetoothctl", "disconnect", mac,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            await asyncio.wait_for(proc.wait(), timeout=5)
+            _log(f"bluetoothctl disconnect {mac} (fallback cleanup)")
+        except Exception as e:
+            _log(f"bluetoothctl fallback disconnect error (non-fatal): {e}")
 
 
 def _write_yaml_response(response: dict) -> str:
