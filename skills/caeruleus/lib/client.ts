@@ -115,8 +115,9 @@ export class BleClient extends EventEmitter implements IBleClient {
         this.socket = socket;
         this.buffer = '';
 
-        // Allow Node.js to exit even if the socket is still open.
+        // Allow Node.js to exit when no requests are pending.
         // The server runs as a detached process and persists independently.
+        // We ref/unref dynamically based on pending request count.
         socket.unref();
 
         socket.on('data', (data: Buffer) => {
@@ -191,6 +192,7 @@ export class BleClient extends EventEmitter implements IBleClient {
     const pending = this.pendingResponses.get(id)!;
     this.pendingResponses.delete(id);
     clearTimeout(pending.timer);
+    this.updateSocketRef();
 
     if (response.status === 'error' && 'error' in response) {
       const err = response.error;
@@ -206,6 +208,16 @@ export class BleClient extends EventEmitter implements IBleClient {
           `Unexpected response: ${JSON.stringify(response)}`,
         ),
       );
+    }
+  }
+
+  /** Ref the socket while requests are pending so Node.js doesn't exit early */
+  private updateSocketRef(): void {
+    if (!this.socket || this.socket.destroyed) return;
+    if (this.pendingResponses.size > 0) {
+      this.socket.ref();
+    } else {
+      this.socket.unref();
     }
   }
 
@@ -243,12 +255,13 @@ export class BleClient extends EventEmitter implements IBleClient {
       const timer = setTimeout(() => {
         if (this.pendingResponses.has(id)) {
           this.pendingResponses.delete(id);
+          this.updateSocketRef();
           reject(new BleTimeoutError(params.command, timeoutMs));
         }
       }, timeoutMs);
-      timer.unref();
 
       this.pendingResponses.set(id, { resolve, reject, timer });
+      this.updateSocketRef();
     });
   }
 
