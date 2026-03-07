@@ -1682,8 +1682,10 @@ async def _cleanup_ble():
     if _client is not None:
         _log("Disconnecting BLE device...")
         try:
-            await _client.disconnect()
+            await asyncio.wait_for(_client.disconnect(), timeout=5)
             _log("BLE disconnected cleanly")
+        except asyncio.TimeoutError:
+            _log("BLE disconnect timed out (Bleak stuck) — falling through to bluetoothctl")
         except Exception as e:
             _log(f"BLE disconnect error (best-effort): {e}")
         _client = None
