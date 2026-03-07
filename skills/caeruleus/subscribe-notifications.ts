@@ -17,6 +17,7 @@ import { BleMacAddressSchema, estimateTokens } from './lib/types.js';
 export const subscribeNotificationsParams = z.object({
   mac_address: BleMacAddressSchema,
   gatt_map_path: z.string().optional(),
+  uuid: z.string().optional(),
   uuids: z.array(z.string()).optional(),
   duration: z.number().min(1).max(3600).default(30),
   write_handle: z.number().optional(),
@@ -62,8 +63,11 @@ export const subscribeNotifications = {
         + '(0x2902). For full compatibility, use Linux/BlueZ.'
       : null;
 
-    // Determine which UUIDs to subscribe to
-    let targetUuids = validated.uuids || [];
+    // Determine which UUIDs to subscribe to (accept both singular uuid and plural uuids)
+    let targetUuids = validated.uuids ? [...validated.uuids] : [];
+    if (validated.uuid && !targetUuids.includes(validated.uuid)) {
+      targetUuids.push(validated.uuid);
+    }
 
     if (targetUuids.length === 0 && validated.gatt_map_path) {
       const gattRaw = await readFile(validated.gatt_map_path, 'utf-8');
@@ -80,16 +84,51 @@ export const subscribeNotifications = {
     if (targetUuids.length === 0) {
       return {
         error: 'No notifiable/indicatable characteristics found',
-        suggestion: 'Provide uuids array or gatt_map_path with notify/indicate characteristics',
+        suggestion: 'Provide uuid, uuids array, or gatt_map_path with notify/indicate characteristics',
       };
+    }
+
+    // Query GATT map to determine characteristic properties for auto-enabling
+    // notifications/indications when the Bleak path falls back to raw L2CAP.
+    type CharProps = { notify?: boolean; indicate?: boolean };
+    const charPropsMap = new Map<string, CharProps>();
+    try {
+      const gattMap = (await callFn('get_gatt_map', {
+        mac_address: validated.mac_address,
+      })) as Record<string, unknown>;
+      const services = (gattMap.services as Array<Record<string, unknown>>) || [];
+      for (const svc of services) {
+        for (const char of (svc.characteristics as Array<Record<string, unknown>>) || []) {
+          const uuid = char.uuid as string;
+          const props = char.properties as CharProps | undefined;
+          if (props) charPropsMap.set(uuid, props);
+        }
+      }
+    } catch {
+      // GATT map query failed — will proceed without auto-enable hints
     }
 
     const captures: Array<Record<string, unknown>> = [];
     const findings: Array<Record<string, unknown>> = [];
 
+    const isLinux = process.platform === 'linux';
+
     for (const uuid of targetUuids) {
       try {
         const serverCommand = validated.raw ? 'subscribe_raw' : 'subscribe';
+
+        // Auto-determine the CCCD enable value from characteristic properties
+        // so the server's raw L2CAP fallback can enable notifications/indications.
+        let writeValueHex = validated.write_value_hex;
+        if (writeValueHex === undefined) {
+          const props = charPropsMap.get(uuid);
+          if (props?.indicate) {
+            writeValueHex = '0200';
+          } else if (props?.notify) {
+            writeValueHex = '0100';
+          }
+        }
+
         const subParams: Record<string, unknown> = {
           mac_address: validated.mac_address,
           uuid,
@@ -99,10 +138,40 @@ export const subscribeNotifications = {
         if (validated.write_handle !== undefined) {
           subParams.write_handle = validated.write_handle;
         }
-        if (validated.write_value_hex !== undefined) {
-          subParams.write_value_hex = validated.write_value_hex;
+        if (writeValueHex !== undefined) {
+          subParams.write_value_hex = writeValueHex;
         }
-        const subResult = (await callFn(serverCommand, subParams)) as Record<string, unknown>;
+
+        let subResult: Record<string, unknown>;
+
+        if (serverCommand === 'subscribe') {
+          // Try Bleak subscribe with a short timeout — if it hangs (CCCD-less
+          // device), fall back to subscribe_raw at the wrapper level rather than
+          // waiting for the server's full retry chain.
+          const bleakTimeout = Math.min(validated.duration * 1000 + 15_000, 30_000);
+          try {
+            subResult = (await callFn('subscribe', {
+              ...subParams,
+              timeout_ms: bleakTimeout,
+            })) as Record<string, unknown>;
+          } catch {
+            subResult = { notifications: [] };
+          }
+
+          const bleakNotifs = (subResult.notifications as Array<Record<string, unknown>>) || [];
+          if (bleakNotifs.length === 0 && isLinux) {
+            // Bleak path failed or returned 0 — retry via raw L2CAP with enable value
+            subResult = (await callFn('subscribe_raw', {
+              mac_address: validated.mac_address,
+              uuid,
+              duration: validated.duration,
+              timeout_ms: (validated.duration + 30) * 1000,
+              ...(writeValueHex ? { write_value_hex: writeValueHex } : {}),
+            })) as Record<string, unknown>;
+          }
+        } else {
+          subResult = (await callFn(serverCommand, subParams)) as Record<string, unknown>;
+        }
 
         const notifications = (subResult.notifications as Array<Record<string, unknown>>) || [];
 

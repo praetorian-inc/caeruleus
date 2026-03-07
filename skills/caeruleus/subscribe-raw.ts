@@ -19,6 +19,8 @@ export const subscribeRawParams = z.object({
   handle: z.number().optional(),
   duration: z.number().min(1).max(3600).default(10),
   write_value_hex: z.string().optional(),
+  enable_notifications: z.boolean().optional(),
+  enable_indications: z.boolean().optional(),
 });
 export type SubscribeRawInput = z.infer<typeof subscribeRawParams>;
 
@@ -48,7 +50,15 @@ export const subscribeRaw = {
     };
     if (validated.uuid) rawParams.uuid = validated.uuid;
     if (validated.handle !== undefined) rawParams.write_handle = validated.handle;
-    if (validated.write_value_hex) rawParams.write_value_hex = validated.write_value_hex;
+
+    // Resolve write_value_hex: explicit value takes priority, then convenience flags
+    if (validated.write_value_hex) {
+      rawParams.write_value_hex = validated.write_value_hex;
+    } else if (validated.enable_indications) {
+      rawParams.write_value_hex = '0200';
+    } else if (validated.enable_notifications) {
+      rawParams.write_value_hex = '0100';
+    }
 
     const result = (await callFn('subscribe_raw', rawParams)) as Record<string, unknown>;
 
