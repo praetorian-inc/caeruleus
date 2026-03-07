@@ -125,11 +125,14 @@ ESP32-Gattacker      - MITM relay via WebSocket (ws://1.3.3.7/ws)
 | `batch-read` | Read multiple characteristics in one session | `mac_address`, `reads` |
 | `batch-write` | Write to multiple characteristics in one session | `mac_address`, `writes`, `delay_ms` |
 | `subscribe-raw` | Subscribe via raw L2CAP ATT socket (Linux) | `uuid`, `handle`, `write_value_hex`, `duration` |
+| `raw-att` | Execute raw ATT operations (MTU exchange, handle read/write, listen) | `mac_address`, `operations` |
 | `shutdown-server` | Gracefully stop the server (disconnects BLE first) | (none) |
 
 **When to use `batch-write`:** Ideal for brute-force challenges or bulk operations — generate an array of writes with `read_after_write: true` to test value ranges (e.g., 0x00-0xFF) in a single persistent connection, far faster than individual write+read calls in a loop.
 
 **When to use `subscribe-raw`:** Use when `subscribe-notifications` fails due to missing CCCD descriptors (common on CTF boards and non-compliant IoT firmware). Bypasses Bleak's D-Bus notification path and opens a direct L2CAP ATT socket. Also supports `subscribe-notifications` with `raw: true` to route through the same raw path with sensitive-data analysis. Note: raw subscribe disconnects Bleak temporarily; the server auto-reconnects afterward.
+
+**When to use `raw-att`:** Use for ATT-level operations that Bleak doesn't expose — MTU negotiation (`exchange_mtu`), handle-level reads/writes by numeric handle, and passive ATT traffic listening. The `operations` array accepts a sequence of `exchange_mtu`, `read`, `write`, and `listen` operations executed in order over a single L2CAP socket. Like `subscribe-raw`, this disconnects Bleak temporarily and auto-reconnects afterward.
 
 **NEVER use `pkill -f caeruleus-server` to stop the server.** Hard-killing the process leaves the BLE connection open at the BlueZ/kernel level, which blocks subsequent connections to single-connection devices (e.g., most BLE peripherals). Always use `shutdown-server` instead — it sends a BLE disconnect before exiting.
 

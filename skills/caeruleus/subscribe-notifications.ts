@@ -149,16 +149,31 @@ export const subscribeNotifications = {
       }
     }
 
+    const totalNotifications = captures.reduce(
+      (sum, c) => sum + ((c.notification_count as number) || 0),
+      0,
+    );
+
+    // Detect likely CCCD-less device: Bleak subscribe path returned 0
+    // notifications or timed out on every characteristic.  Suggest raw mode.
+    const allFailed = captures.every(
+      (c) => (c.notification_count as number) === 0 || c.error,
+    );
+    const rawSuggestion =
+      !validated.raw && allFailed && totalNotifications === 0
+        ? 'All subscriptions returned 0 notifications. The device may lack CCCD '
+          + 'descriptors (common in CTF boards and non-compliant IoT firmware). '
+          + 'Retry with raw: true or use subscribe-raw directly for L2CAP ATT bypass.'
+        : null;
+
     const result: Record<string, unknown> = {
       duration_seconds: validated.duration,
       characteristics_monitored: targetUuids.length,
       captures,
       findings,
-      total_notifications: captures.reduce(
-        (sum, c) => sum + ((c.notification_count as number) || 0),
-        0,
-      ),
+      total_notifications: totalNotifications,
       ...(macosWarning ? { platform_warning: macosWarning } : {}),
+      ...(rawSuggestion ? { suggestion: rawSuggestion } : {}),
       estimatedTokens: 0,
     };
 

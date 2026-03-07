@@ -5,7 +5,7 @@
  * across multiple skill invocations. Auto-starts if not running.
  */
 
-import { spawn } from 'node:child_process';
+import { spawn, execFile } from 'node:child_process';
 import { connect as netConnect, type Socket } from 'node:net';
 import { existsSync } from 'node:fs';
 import { EventEmitter } from 'node:events';
@@ -297,11 +297,45 @@ export class BleClient extends EventEmitter implements IBleClient {
   }
 }
 
-/** Convenience function — call BLE server command via singleton client */
+/**
+ * Attempt to clear an orphaned BlueZ/kernel-level HCI connection via
+ * bluetoothctl.  This is a best-effort recovery — if it fails, we
+ * surface the original error.
+ */
+async function bluetoothctlDisconnect(mac: string): Promise<boolean> {
+  if (process.platform !== 'linux') return false;
+  return new Promise((resolve) => {
+    execFile('bluetoothctl', ['disconnect', mac], { timeout: 5000 }, (err) => {
+      resolve(!err);
+    });
+  });
+}
+
+/** Convenience function — call BLE server command via singleton client.
+ *
+ *  Includes auto-retry logic: if a `connect` command fails with
+ *  DEVICE_NOT_FOUND, we attempt a `bluetoothctl disconnect` to clear any
+ *  orphaned BlueZ connection (left by a raw L2CAP socket or killed process),
+ *  wait briefly for the device to resume advertising, then retry once.
+ */
 export async function callBle(
   command: string,
   params: Record<string, unknown> = {},
 ): Promise<unknown> {
   const client = BleClient.getInstance();
-  return client.call({ command, params });
+  try {
+    return await client.call({ command, params });
+  } catch (err) {
+    const bleErr = err as BleError;
+    if (bleErr.code === 'DEVICE_NOT_FOUND' && command === 'connect' && params.mac_address) {
+      const mac = params.mac_address as string;
+      const cleaned = await bluetoothctlDisconnect(mac);
+      if (cleaned) {
+        // Wait for device to resume advertising after forced disconnect
+        await new Promise((r) => setTimeout(r, 2000));
+        return client.call({ command, params });
+      }
+    }
+    throw err;
+  }
 }

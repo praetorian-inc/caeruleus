@@ -947,12 +947,28 @@ async def cmd_subscribe_raw(params: dict) -> dict:
     finally:
         raw.close()
 
-    # Reconnect via Bleak for subsequent commands.
-    # Reset state first so a failed reconnect leaves a clean slate
-    # (avoids 'NoneType' has no attribute 'mtu_size' on next command).
+    # Tear down any lingering BlueZ/kernel-level HCI connection left by the
+    # raw L2CAP socket before attempting Bleak reconnect.  Without this,
+    # single-connection peripherals stay "connected" at the BlueZ level and
+    # stop advertising, causing the next Bleak scan to fail with
+    # DEVICE_NOT_FOUND.
     _client = None
     _gatt_cache = None
     _connected_mac = mac
+    if IS_LINUX and mac:
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                "bluetoothctl", "disconnect", mac,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            await asyncio.wait_for(proc.wait(), timeout=5)
+            _log(f"subscribe_raw: bluetoothctl disconnect {mac} (post-raw cleanup)")
+        except Exception as e:
+            _log(f"subscribe_raw: bluetoothctl cleanup error (non-fatal): {e}")
+        # Short delay to let the device resume advertising
+        await asyncio.sleep(1)
+
     try:
         await _ensure_connected(mac)
         _log("subscribe_raw: reconnected via Bleak")
@@ -1180,13 +1196,31 @@ async def cmd_raw_att(params: dict) -> dict:
     finally:
         raw.close()
 
-    # Reconnect via Bleak
+    # Tear down lingering BlueZ connection before Bleak reconnect (same
+    # rationale as subscribe_raw — prevents DEVICE_NOT_FOUND on next call).
+    _client = None
+    _gatt_cache = None
     _connected_mac = mac
+    if IS_LINUX and mac:
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                "bluetoothctl", "disconnect", mac,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            await asyncio.wait_for(proc.wait(), timeout=5)
+            _log(f"raw_att: bluetoothctl disconnect {mac} (post-raw cleanup)")
+        except Exception as e:
+            _log(f"raw_att: bluetoothctl cleanup error (non-fatal): {e}")
+        await asyncio.sleep(1)
+
     try:
         await _ensure_connected(mac)
         _log("raw_att: reconnected via Bleak")
     except Exception as e:
         _log(f"raw_att: Bleak reconnect failed (non-fatal): {e}")
+        _client = None
+        _connected_mac = None
 
     return {"operations": results}
 
@@ -1663,10 +1697,13 @@ async def _dispatch_command(request: dict) -> dict:
         _log(f"Command {command} error: {e}")
         _log(traceback.format_exc())
         code, recoverable = _classify_error(e)
+        # Ensure the error message is never empty — some exceptions (e.g.
+        # OSError with errno 0, bare Exception()) produce empty str(e).
+        message = str(e) or repr(e) or f"{type(e).__name__} (no message)"
         return {
             "id": request_id,
             "status": "error",
-            "error": {"code": code, "message": str(e), "recoverable": recoverable},
+            "error": {"code": code, "message": message, "recoverable": recoverable},
         }
 
 
