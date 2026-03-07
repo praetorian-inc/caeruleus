@@ -116,6 +116,13 @@ ESP32-Gattacker      - MITM relay via WebSocket (ws://1.3.3.7/ws)
 | --- | --- | --- |
 | `read-characteristic` | Read a characteristic value | `uuid` |
 | `write-characteristic` | Write to a characteristic | `uuid`, `value_hex`, `response` |
+| `batch-read` | Read multiple characteristics in one session | `mac_address`, `reads` |
+| `batch-write` | Write to multiple characteristics in one session | `mac_address`, `writes`, `delay_ms` |
+| `subscribe-raw` | Subscribe via raw L2CAP ATT socket (Linux) | `uuid`, `handle`, `write_value_hex`, `duration` |
+
+**When to use `batch-write`:** Ideal for brute-force challenges or bulk operations — generate an array of writes with `read_after_write: true` to test value ranges (e.g., 0x00-0xFF) in a single persistent connection, far faster than individual write+read calls in a loop.
+
+**When to use `subscribe-raw`:** Use when `subscribe-notifications` fails due to missing CCCD descriptors (common on CTF boards and non-compliant IoT firmware). Bypasses Bleak's D-Bus notification path and opens a direct L2CAP ATT socket. Also supports `subscribe-notifications` with `raw: true` to route through the same raw path with sensitive-data analysis. Note: raw subscribe disconnects Bleak temporarily; the server auto-reconnects afterward.
 
 ## Usage
 
