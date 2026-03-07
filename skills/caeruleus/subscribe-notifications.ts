@@ -90,8 +90,12 @@ export const subscribeNotifications = {
 
     // Query GATT map to determine characteristic properties for auto-enabling
     // notifications/indications when the Bleak path falls back to raw L2CAP.
+    // Also detect CCCD-less characteristics to skip Bleak subscribe entirely
+    // (Bleak hangs on start_notify when the device lacks CCCD descriptors).
     type CharProps = { notify?: boolean; indicate?: boolean };
+    const CCCD_UUID = '00002902-0000-1000-8000-00805f9b34fb';
     const charPropsMap = new Map<string, CharProps>();
+    const charHasCccd = new Map<string, boolean>();
     try {
       const gattMap = (await callFn('get_gatt_map', {
         mac_address: validated.mac_address,
@@ -102,6 +106,9 @@ export const subscribeNotifications = {
           const uuid = char.uuid as string;
           const props = char.properties as CharProps | undefined;
           if (props) charPropsMap.set(uuid, props);
+          const descs = (char.descriptors as Array<Record<string, unknown>>) || [];
+          const hasCccd = descs.some((d) => (d.uuid as string) === CCCD_UUID);
+          charHasCccd.set(uuid, hasCccd);
         }
       }
     } catch {
@@ -145,22 +152,32 @@ export const subscribeNotifications = {
         let subResult: Record<string, unknown>;
 
         if (serverCommand === 'subscribe') {
-          // Try Bleak subscribe with a short timeout — if it hangs (CCCD-less
-          // device), fall back to subscribe_raw at the wrapper level rather than
-          // waiting for the server's full retry chain.
-          const bleakTimeout = Math.min(validated.duration * 1000 + 15_000, 30_000);
-          try {
-            subResult = (await callFn('subscribe', {
-              ...subParams,
-              timeout_ms: bleakTimeout,
-            })) as Record<string, unknown>;
-          } catch {
+          // If the GATT map shows no CCCD descriptor for this characteristic,
+          // skip Bleak subscribe entirely — it will hang on start_notify at the
+          // D-Bus level. Go straight to raw L2CAP.
+          const hasCccd = charHasCccd.get(uuid);
+          const skipBleak = isLinux && hasCccd === false;
+
+          if (!skipBleak) {
+            // Try Bleak subscribe with a short timeout — if it hangs (CCCD-less
+            // device), fall back to subscribe_raw at the wrapper level rather than
+            // waiting for the server's full retry chain.
+            const bleakTimeout = Math.min(validated.duration * 1000 + 15_000, 30_000);
+            try {
+              subResult = (await callFn('subscribe', {
+                ...subParams,
+                timeout_ms: bleakTimeout,
+              })) as Record<string, unknown>;
+            } catch {
+              subResult = { notifications: [] };
+            }
+          } else {
             subResult = { notifications: [] };
           }
 
           const bleakNotifs = (subResult.notifications as Array<Record<string, unknown>>) || [];
           if (bleakNotifs.length === 0 && isLinux) {
-            // Bleak path failed or returned 0 — retry via raw L2CAP with enable value
+            // Bleak path skipped or returned 0 — use raw L2CAP with enable value
             subResult = (await callFn('subscribe_raw', {
               mac_address: validated.mac_address,
               uuid,

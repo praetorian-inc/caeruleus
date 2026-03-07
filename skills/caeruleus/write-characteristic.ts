@@ -13,7 +13,7 @@ import { BleError } from './lib/errors.js';
 import { BleMacAddressSchema, estimateTokens } from './lib/types.js';
 
 export const writeCharacteristicParams = z.object({
-  mac_address: BleMacAddressSchema,
+  mac_address: BleMacAddressSchema.optional(),
   uuid: z.string().min(4),
   handle: z.string().optional(),
   value_hex: z.string().regex(/^[0-9a-fA-F]*$/, 'Value must be hex string'),
@@ -36,8 +36,10 @@ export const writeCharacteristic = {
           client.call({ command: cmd, params })
       : callBle;
 
-    // Ensure connected
-    await callFn('connect', { mac_address: validated.mac_address });
+    // Ensure connected (skip if no mac_address — reuse existing connection)
+    if (validated.mac_address) {
+      await callFn('connect', { mac_address: validated.mac_address });
+    }
 
     const command = validated.response ? 'write_characteristic' : 'write_no_response';
     const raw = (await callFn(command, {
