@@ -80,6 +80,8 @@ The Python server is **persistent** — it stays alive across multiple commands 
 |---|---|
 | `read-characteristic.ts` | Read a single characteristic value |
 | `write-characteristic.ts` | Write to a single characteristic |
+| `batch-read.ts` | Read multiple characteristics in one session |
+| `batch-write.ts` | Write to multiple characteristics with optional read-after-write |
 
 ## Prerequisites
 
