@@ -52,7 +52,8 @@ Two server commands bypass Bleak's D-Bus layer to operate directly on L2CAP ATT 
 |---|---|
 | `test-pairing.ts` | Test pairing enforcement and methods |
 | `test-encryption.ts` | Test encryption requirements per characteristic |
-| `subscribe-notifications.ts` | Monitor notifications and indications |
+| `subscribe-notifications.ts` | Monitor notifications and indications (supports `raw: true` for CCCD-less devices) |
+| `subscribe-raw.ts` | Raw L2CAP ATT notification/indication capture (Linux, bypasses Bleak) |
 | `audit-gatt-profile.ts` | Audit GATT profile against BLE spec |
 | `sniff-decode.ts` | Capture and decode BLE packets |
 | `analyze-connection-params.ts` | Analyze connection parameters |

@@ -947,13 +947,20 @@ async def cmd_subscribe_raw(params: dict) -> dict:
     finally:
         raw.close()
 
-    # Reconnect via Bleak for subsequent commands
+    # Reconnect via Bleak for subsequent commands.
+    # Reset state first so a failed reconnect leaves a clean slate
+    # (avoids 'NoneType' has no attribute 'mtu_size' on next command).
+    _client = None
+    _gatt_cache = None
     _connected_mac = mac
     try:
         await _ensure_connected(mac)
         _log("subscribe_raw: reconnected via Bleak")
     except Exception as e:
         _log(f"subscribe_raw: Bleak reconnect failed (non-fatal): {e}")
+        # Ensure next command triggers a fresh connection attempt
+        _client = None
+        _connected_mac = None
 
     return {
         "uuid": uuid,

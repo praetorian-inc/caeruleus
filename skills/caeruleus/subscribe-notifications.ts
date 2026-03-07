@@ -21,6 +21,7 @@ export const subscribeNotificationsParams = z.object({
   duration: z.number().min(1).max(3600).default(30),
   write_handle: z.number().optional(),
   write_value_hex: z.string().optional(),
+  raw: z.boolean().default(false),
 });
 export type SubscribeNotificationsInput = z.infer<typeof subscribeNotificationsParams>;
 
@@ -88,6 +89,7 @@ export const subscribeNotifications = {
 
     for (const uuid of targetUuids) {
       try {
+        const serverCommand = validated.raw ? 'subscribe_raw' : 'subscribe';
         const subParams: Record<string, unknown> = {
           mac_address: validated.mac_address,
           uuid,
@@ -100,7 +102,7 @@ export const subscribeNotifications = {
         if (validated.write_value_hex !== undefined) {
           subParams.write_value_hex = validated.write_value_hex;
         }
-        const subResult = (await callFn('subscribe', subParams)) as Record<string, unknown>;
+        const subResult = (await callFn(serverCommand, subParams)) as Record<string, unknown>;
 
         const notifications = (subResult.notifications as Array<Record<string, unknown>>) || [];
 
