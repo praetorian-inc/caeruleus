@@ -231,7 +231,23 @@ Error: ADAPTER_NOT_FOUND - BlueZ adapter hci0 not found
 Error: DEVICE_NOT_FOUND - Target not in scan range
 ```
 
-**Fix:** Run `scan-devices` to see nearby devices. Ensure target is powered on and advertising.
+**Fix:** Run `scan-devices` to see nearby devices. Ensure target is powered on and advertising. If the device was previously connected, check for orphaned BlueZ connections (see below).
+
+### Orphaned BlueZ Connection
+
+If a wrapper process is killed (e.g. `pkill`, Ctrl-C on a background task) while the server holds a BLE connection, the kernel-level HCI link can survive even after the Python server exits. This blocks single-connection peripherals from advertising or accepting new connections.
+
+**Diagnose:**
+```bash
+bluetoothctl devices Connected
+```
+
+**Fix:**
+```bash
+bluetoothctl disconnect <MAC>
+```
+
+**Root cause:** Killing the Node.js wrapper does not stop the detached Python server, and if Bleak is stuck (e.g. mid-`start_notify` on a CCCD-less device), `_cleanup_ble` previously hung on `_client.disconnect()` and never reached the `bluetoothctl` fallback. The server now applies a 5-second timeout to the Bleak disconnect to ensure the fallback always runs. **Always use `shutdown-server` instead of `pkill` to stop the server.**
 
 ### Connection Lost
 
