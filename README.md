@@ -90,6 +90,7 @@ Two server commands bypass Bleak's D-Bus layer to operate directly on L2CAP ATT 
 | `write-characteristic.ts` | Write to a single characteristic |
 | `batch-read.ts` | Read multiple characteristics in one session |
 | `batch-write.ts` | Write to multiple characteristics with optional read-after-write |
+| `shutdown-server.ts` | Gracefully stop the server (disconnects BLE before exiting) |
 
 ## Prerequisites
 
@@ -111,6 +112,10 @@ Two server commands bypass Bleak's D-Bus layer to operate directly on L2CAP ATT 
 cd skills/caeruleus
 pip install -r requirements.txt
 npm install
+
+# Linux: ensure Bluetooth service is running and adapter is up
+sudo systemctl start bluetooth
+sudo hciconfig hci0 up
 
 # Scan for devices
 npx tsx scan-devices.ts '{"duration": 10}'
