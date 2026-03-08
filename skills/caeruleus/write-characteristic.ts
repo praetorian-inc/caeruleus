@@ -16,9 +16,13 @@ export const writeCharacteristicParams = z.object({
   mac_address: BleMacAddressSchema.optional(),
   uuid: z.string().min(4),
   handle: z.string().optional(),
-  value_hex: z.string().regex(/^[0-9a-fA-F]*$/, 'Value must be hex string'),
+  value_hex: z.string().regex(/^[0-9a-fA-F]*$/, 'Value must be hex string').optional(),
+  value_ascii: z.string().optional(),
   response: z.boolean().default(true),
-});
+}).refine(
+  (d) => d.value_hex !== undefined || d.value_ascii !== undefined,
+  { message: 'Either value_hex or value_ascii is required' },
+);
 export type WriteCharacteristicInput = z.infer<typeof writeCharacteristicParams>;
 
 export const writeCharacteristic = {
@@ -36,6 +40,10 @@ export const writeCharacteristic = {
           client.call({ command: cmd, params })
       : callBle;
 
+    // Resolve value_ascii → value_hex if needed
+    const value_hex = validated.value_hex
+      ?? Buffer.from(validated.value_ascii!, 'utf-8').toString('hex');
+
     // Ensure connected (skip if no mac_address — reuse existing connection)
     if (validated.mac_address) {
       await callFn('connect', { mac_address: validated.mac_address });
@@ -45,13 +53,13 @@ export const writeCharacteristic = {
     const raw = (await callFn(command, {
       uuid: validated.uuid,
       handle: validated.handle,
-      value_hex: validated.value_hex,
+      value_hex,
     })) as Record<string, unknown>;
 
     const result = {
       uuid: validated.uuid,
       handle: validated.handle,
-      value_hex: validated.value_hex,
+      value_hex,
       response_mode: validated.response,
       success: raw.success ?? true,
       raw_response: raw,

@@ -121,9 +121,9 @@ ESP32-Gattacker      - MITM relay via WebSocket (ws://1.3.3.7/ws)
 | Wrapper | Purpose | Key Parameters |
 | --- | --- | --- |
 | `read-characteristic` | Read a characteristic value | `uuid` |
-| `write-characteristic` | Write to a characteristic | `uuid`, `value_hex`, `response` |
-| `batch-read` | Read multiple characteristics in one session | `mac_address`, `reads` |
-| `batch-write` | Write to multiple characteristics in one session | `mac_address`, `writes`, `delay_ms` |
+| `write-characteristic` | Write to a characteristic | `uuid`, `value_hex` or `value_ascii`, `response` |
+| `batch-read` | Read multiple characteristics in one session | `mac_address`, `uuids` or `reads` |
+| `batch-write` | Write to multiple characteristics in one session | `mac_address`, `writes` (entries accept `value_hex` or `value_ascii`), `delay_ms` |
 | `subscribe-raw` | Subscribe via raw L2CAP ATT socket (Linux) | `uuid`, `handle`, `write_value_hex`, `duration` |
 | `raw-att` | Execute raw ATT operations (MTU exchange, handle read/write, listen) | `mac_address`, `operations` |
 | `shutdown-server` | Gracefully stop the server (disconnects BLE first) | (none) |

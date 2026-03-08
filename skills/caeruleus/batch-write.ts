@@ -16,10 +16,14 @@ import { BleMacAddressSchema, estimateTokens } from './lib/types.js';
 const WriteEntrySchema = z.object({
   uuid: z.string().optional(),
   handle: z.number().optional(),
-  value_hex: z.string().regex(/^[0-9a-fA-F]*$/, 'Value must be hex string'),
+  value_hex: z.string().regex(/^[0-9a-fA-F]*$/, 'Value must be hex string').optional(),
+  value_ascii: z.string().optional(),
   response: z.boolean().default(true),
   read_after_write: z.boolean().default(false),
-});
+}).refine(
+  (d) => d.value_hex !== undefined || d.value_ascii !== undefined,
+  { message: 'Either value_hex or value_ascii is required' },
+);
 
 export const batchWriteParams = z.object({
   mac_address: BleMacAddressSchema,
@@ -58,17 +62,19 @@ export const batchWrite = {
 
     const results: WriteResult[] = [];
     for (const entry of validated.writes) {
+      const entryHex = entry.value_hex
+        ?? Buffer.from(entry.value_ascii!, 'utf-8').toString('hex');
       try {
         if (entry.handle) {
           await callFn('write_handle', {
             handle: entry.handle,
-            value_hex: entry.value_hex,
+            value_hex: entryHex,
           });
         } else if (entry.uuid) {
           const cmd = entry.response ? 'write_characteristic' : 'write_no_response';
           await callFn(cmd, {
             uuid: entry.uuid,
-            value_hex: entry.value_hex,
+            value_hex: entryHex,
           });
         } else {
           throw new Error('Either uuid or handle is required');
@@ -77,7 +83,7 @@ export const batchWrite = {
         const writeResult: WriteResult = {
           uuid: entry.uuid,
           handle: entry.handle,
-          value_hex: entry.value_hex,
+          value_hex: entryHex,
           success: true,
         };
 
@@ -101,7 +107,7 @@ export const batchWrite = {
         results.push({
           uuid: entry.uuid,
           handle: entry.handle,
-          value_hex: entry.value_hex,
+          value_hex: entryHex,
           success: false,
           error: (e as Error).message,
         });

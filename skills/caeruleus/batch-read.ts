@@ -17,6 +17,7 @@ import { BleMacAddressSchema, estimateTokens } from './lib/types.js';
 export const batchReadParams = z.object({
   mac_address: BleMacAddressSchema,
   uuids: z.array(z.string()).optional(),
+  reads: z.array(z.string()).optional(),
   gatt_map_path: z.string().optional(),
   handles: z.array(z.number()).optional(),
 });
@@ -51,10 +52,10 @@ export const batchRead = {
 
     const targets: Array<{ uuid?: string; handle?: number }> = [];
 
-    if (validated.uuids) {
-      for (const uuid of validated.uuids) {
-        targets.push({ uuid });
-      }
+    // Accept both `uuids` and `reads` (alias for symmetry with batch-write's `writes`)
+    const allUuids = [...(validated.uuids ?? []), ...(validated.reads ?? [])];
+    for (const uuid of allUuids) {
+      targets.push({ uuid });
     }
 
     if (validated.handles) {
