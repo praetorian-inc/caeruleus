@@ -1,5 +1,9 @@
 # goatttool fuzzing — plan
 
+> **Status (2026-06-01):** Phase 1a (write_req, write_cmd via BlueZ) and
+> Phase 1b (prep, exec via raw L2CAP) both landed. Phase 2 and Phase 3
+> remain future work (see end of doc).
+
 ## Goals
 
 Add a fuzzing subsystem to goatttool focused on **GATT application-layer

@@ -35,6 +35,8 @@ var fuzzWriteFlags struct {
 	maxTime          time.Duration
 	maxValueLen      int
 	types            string
+	include          string
+	raw              bool
 	livenessHandle   string
 	livenessEvery    int
 	noLiveness       bool
@@ -65,12 +67,19 @@ Each iteration:
 Output (default ./fuzz-out-<ISO>/) is AFL-style: one file per input under
 corpus/ queue/ crashes/ hangs/, plus run.json + trace.jsonl.
 
-Phase 1a covers write_req and write_cmd. Prepare/Execute writes (and
-the raw-L2CAP path) ship in Phase 1b — see docs/fuzzing-plan.md.
+Write variants:
+  --type req    Write Request (0x12), with Write Response oracle
+  --type cmd    Write Command (0x52), no response oracle (liveness only)
+  --type both   randomly alternate
+
+Phase 1b add-ons (--include implies --raw, needs root):
+  --include prep   Prepare Write Request (0x16); input is [offset:LE16 | value]
+  --include exec   Execute Write Request (0x18); input first byte = flags (LSB:
+                   0 cancel, 1 commit)
 
 Examples:
 
-  # Default: write-req, 10000 iters, auto-seed from current value
+  # Default: write-req via BlueZ, 10000 iters, auto-seed from current value
   goatttool -b AA:BB:CC:DD:EE:FF fuzz write -a 0x002c
 
   # Both write variants, 5-minute time cap, custom seed, deterministic RNG
@@ -80,7 +89,11 @@ Examples:
   # Run all night with a target-reset hook
   goatttool -b AA:BB:CC:DD:EE:FF fuzz write -a 0x002c \
       --max-iter 1000000 \
-      --target-reset "ssh root@plug ./toggle.sh && sleep 8"`,
+      --target-reset "ssh root@plug ./toggle.sh && sleep 8"
+
+  # Phase 1b: prep + exec via raw L2CAP — fuzz the prepared-write queue
+  sudo goatttool -b AA:BB:CC:DD:EE:FF fuzz write -a 0x002c \
+      --type both --include prep,exec --max-iter 5000`,
 		RunE: runFuzzWrite,
 	}
 	c.Flags().StringVarP(&fuzzWriteFlags.handle, "handle", "a", "", "target characteristic/descriptor handle")
@@ -94,6 +107,8 @@ Examples:
 	c.Flags().DurationVar(&fuzzWriteFlags.maxTime, "max-time", 0, "wall-clock cap (e.g. 30m, 8h)")
 	c.Flags().IntVar(&fuzzWriteFlags.maxValueLen, "max-value-len", 244, "hard cap on mutated input length (244 = MTU 247 - 3 ATT bytes)")
 	c.Flags().StringVar(&fuzzWriteFlags.types, "type", "req", "write variant(s): req | cmd | both")
+	c.Flags().StringVar(&fuzzWriteFlags.include, "include", "", "extra opcodes to enable, comma-separated: prep, exec (Phase 1b — implies --raw)")
+	c.Flags().BoolVar(&fuzzWriteFlags.raw, "raw", false, "drive writes via raw L2CAP/ATT (Layer B) instead of BlueZ D-Bus; required for prep/exec")
 	c.Flags().StringVar(&fuzzWriteFlags.livenessHandle, "liveness-handle", "", "override auto-detected liveness handle")
 	c.Flags().IntVar(&fuzzWriteFlags.livenessEvery, "liveness-every", 10, "probe target liveness every N iterations")
 	c.Flags().BoolVar(&fuzzWriteFlags.noLiveness, "no-liveness", false, "disable liveness probing entirely (disconnect is the only crash signal)")
@@ -116,6 +131,16 @@ func runFuzzWrite(cmd *cobra.Command, args []string) error {
 	ops, err := parseFuzzTypes(fuzzWriteFlags.types)
 	if err != nil {
 		return err
+	}
+	extra, err := parseFuzzInclude(fuzzWriteFlags.include)
+	if err != nil {
+		return err
+	}
+	ops = append(ops, extra...)
+	useRaw := fuzzWriteFlags.raw
+	if len(extra) > 0 && !useRaw {
+		statusf("--include implies --raw (Prepare/Execute Write are only available via the L2CAP path)")
+		useRaw = true
 	}
 
 	rngSeed := fuzzWriteFlags.rngSeed
@@ -172,26 +197,44 @@ func runFuzzWrite(cmd *cobra.Command, args []string) error {
 	}
 	defer tr.Close()
 
-	// Build harness.
-	h := &bluezHarness{
-		addr:           addr,
-		targetHandle:   target.Handle,
-		livenessHandle: livenessHandle,
-		resetCmd:       fuzzWriteFlags.targetReset,
-		noLiveness:     fuzzWriteFlags.noLiveness,
-		writeTimeout:   time.Duration(root.timeout) * time.Second,
-		// take ownership of the open session
-		sess:       sess,
-		targetPath: target.Path,
+	// Build harness. We always keep the BlueZ session open — even in
+	// --raw mode it carries the liveness probe + GATT enumeration.
+	var h engine.Harness
+	switch {
+	case useRaw:
+		// The L2CAP harness manages its own session internally; close
+		// the one we opened for enumeration before handing off.
+		sess.close()
+		lh, err := newL2CAPHarness(addr, target.Handle, livenessHandle,
+			fuzzWriteFlags.targetReset, fuzzWriteFlags.noLiveness,
+			time.Duration(root.timeout)*time.Second)
+		if err != nil {
+			return err
+		}
+		h = lh
+	default:
+		h = &bluezHarness{
+			addr:           addr,
+			targetHandle:   target.Handle,
+			livenessHandle: livenessHandle,
+			resetCmd:       fuzzWriteFlags.targetReset,
+			noLiveness:     fuzzWriteFlags.noLiveness,
+			writeTimeout:   time.Duration(root.timeout) * time.Second,
+			sess:           sess,
+			targetPath:     target.Path,
+		}
 	}
 	defer h.Close()
 
-	// MaxLen cap should never exceed the negotiated MTU - 3.
+	// MaxLen cap should never exceed the negotiated MTU - 3. Read the MTU
+	// before handing the session off to the harness (L2CAP path closes it).
 	maxLen := fuzzWriteFlags.maxValueLen
-	if mtu, err := sess.conn.Characteristic(target.Path).MTU(); err == nil && mtu > 3 {
-		cap := int(mtu) - 3
-		if maxLen <= 0 || cap < maxLen {
-			maxLen = cap
+	if !useRaw {
+		if mtu, err := sess.conn.Characteristic(target.Path).MTU(); err == nil && mtu > 3 {
+			cap := int(mtu) - 3
+			if maxLen <= 0 || cap < maxLen {
+				maxLen = cap
+			}
 		}
 	}
 
@@ -304,6 +347,30 @@ func parseFuzzTypes(s string) ([]engine.Op, error) {
 		return nil, fmt.Errorf("--type: empty")
 	}
 	return ops, nil
+}
+
+// parseFuzzInclude parses --include (Phase 1b) into extra Ops to fold
+// into the rotation. Recognised tokens: prep | prepare, exec | execute.
+// Empty string returns nil.
+func parseFuzzInclude(s string) ([]engine.Op, error) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return nil, nil
+	}
+	var out []engine.Op
+	for _, tok := range strings.Split(s, ",") {
+		switch strings.ToLower(strings.TrimSpace(tok)) {
+		case "":
+			continue
+		case "prep", "prepare", "prep_write":
+			out = append(out, engine.OpPrepWrite)
+		case "exec", "execute", "exec_write":
+			out = append(out, engine.OpExecWrite)
+		default:
+			return nil, fmt.Errorf("--include: unknown token %q (try prep,exec)", tok)
+		}
+	}
+	return out, nil
 }
 
 func opsToStrings(ops []engine.Op) []string {

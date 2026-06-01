@@ -39,10 +39,18 @@ const (
 	OpErrorResponse           = 0x01
 	OpWriteRequest            = 0x12
 	OpWriteResponse           = 0x13
+	OpPrepareWriteRequest     = 0x16
+	OpPrepareWriteResponse    = 0x17
+	OpExecuteWriteRequest     = 0x18
+	OpExecuteWriteResponse    = 0x19
 	OpWriteCommand            = 0x52
 	OpHandleValueNotification = 0x1B
 	OpHandleValueIndication   = 0x1D
 	OpHandleValueConfirmation = 0x1E
+
+	// Execute Write flags (Core Spec Vol 3 Part F §3.4.6).
+	ExecFlagCancel = 0x00
+	ExecFlagCommit = 0x01
 )
 
 // Conn is an open L2CAP socket bound to the ATT channel of a single LE
@@ -152,6 +160,101 @@ func (c *Conn) WriteCommand(handle uint16, value []byte) error {
 		return fmt.Errorf("ATT Write Command send: %w", err)
 	}
 	return nil
+}
+
+// Response is a structured ATT response from a request-type opcode. Used
+// by the fuzzing engine to distinguish "ATT Error Response" (interesting
+// data, not a failure) from "no response at all" (transport problem).
+type Response struct {
+	Opcode  uint8  // OpWriteResponse / OpPrepareWriteResponse / OpExecuteWriteResponse / OpErrorResponse
+	ErrCode uint8  // when Opcode == OpErrorResponse
+	ReqOp   uint8  // the opcode the peripheral is reporting on (Error Response only)
+	Handle  uint16 // the handle in question (Error Response only)
+	Body    []byte // response PDU body, post-opcode (for Prepare Write Response = the echoed write)
+}
+
+// AttErrorString exposes the Core-Spec code → name mapping for callers
+// that want to log a human-readable form alongside the numeric code.
+func AttErrorString(code uint8) string { return attErrorString(code) }
+
+// WriteRequestEx is the structured-response variant of WriteRequest.
+// Transport errors (socket dead, timeout) return err != nil; an ATT
+// Error Response is a successful return with Response.Opcode ==
+// OpErrorResponse, which is what the fuzzer wants — an error code from
+// the peripheral is signal, not failure.
+func (c *Conn) WriteRequestEx(handle uint16, value []byte, timeout time.Duration) (Response, error) {
+	pdu := make([]byte, 3+len(value))
+	pdu[0] = OpWriteRequest
+	binary.LittleEndian.PutUint16(pdu[1:3], handle)
+	copy(pdu[3:], value)
+	return c.requestAndRead(pdu, OpWriteRequest, timeout)
+}
+
+// PrepareWrite sends ATT Prepare Write Request (0x16). The peripheral
+// queues (handle, offset, value) and echoes it back in the Prepare Write
+// Response — the response Body is the echoed write. Multiple Prepare
+// Writes can accumulate before an Execute Write commits or cancels them.
+func (c *Conn) PrepareWrite(handle uint16, offset uint16, value []byte, timeout time.Duration) (Response, error) {
+	pdu := make([]byte, 5+len(value))
+	pdu[0] = OpPrepareWriteRequest
+	binary.LittleEndian.PutUint16(pdu[1:3], handle)
+	binary.LittleEndian.PutUint16(pdu[3:5], offset)
+	copy(pdu[5:], value)
+	return c.requestAndRead(pdu, OpPrepareWriteRequest, timeout)
+}
+
+// ExecuteWrite sends ATT Execute Write Request (0x18) with flags = 0x00
+// (cancel) or 0x01 (commit). The peripheral applies (or discards) the
+// previously-queued Prepare Writes and replies with an Execute Write
+// Response (or an Error Response).
+func (c *Conn) ExecuteWrite(flags uint8, timeout time.Duration) (Response, error) {
+	pdu := []byte{OpExecuteWriteRequest, flags}
+	return c.requestAndRead(pdu, OpExecuteWriteRequest, timeout)
+}
+
+// requestAndRead sends pdu, then reads up to MaxRespSize bytes back and
+// parses the response. expectReq is the opcode being sent — used only
+// for the diagnostic in the "unexpected response" path.
+func (c *Conn) requestAndRead(pdu []byte, expectReq uint8, timeout time.Duration) (Response, error) {
+	if _, err := unix.Write(c.fd, pdu); err != nil {
+		return Response{}, fmt.Errorf("ATT request 0x%02x send: %w", expectReq, err)
+	}
+	if timeout > 0 {
+		tv := unix.Timeval{Sec: int64(timeout / time.Second), Usec: int64((timeout % time.Second) / time.Microsecond)}
+		_ = unix.SetsockoptTimeval(c.fd, unix.SOL_SOCKET, unix.SO_RCVTIMEO, &tv)
+	}
+	buf := make([]byte, 512)
+	n, err := unix.Read(c.fd, buf)
+	if err != nil {
+		return Response{}, fmt.Errorf("ATT request 0x%02x response read: %w", expectReq, err)
+	}
+	if n < 1 {
+		return Response{}, errors.New("ATT response: empty")
+	}
+	r := Response{Opcode: buf[0]}
+	switch buf[0] {
+	case OpErrorResponse:
+		if n < 5 {
+			return Response{}, fmt.Errorf("ATT Error Response truncated (%d bytes)", n)
+		}
+		r.ReqOp = buf[1]
+		r.Handle = binary.LittleEndian.Uint16(buf[2:4])
+		r.ErrCode = buf[4]
+		return r, nil
+	case OpWriteResponse, OpExecuteWriteResponse:
+		// no body
+		return r, nil
+	case OpPrepareWriteResponse:
+		if n > 1 {
+			r.Body = append([]byte(nil), buf[1:n]...)
+		}
+		return r, nil
+	default:
+		if n > 1 {
+			r.Body = append([]byte(nil), buf[1:n]...)
+		}
+		return r, nil
+	}
 }
 
 // attErrorString maps an ATT error code byte to its Core-Spec name.
