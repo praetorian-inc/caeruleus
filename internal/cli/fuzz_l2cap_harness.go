@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 	"time"
 
 	"github.com/godbus/dbus/v5"
@@ -155,7 +156,7 @@ func (h *l2capHarness) Liveness(ctx context.Context) error {
 	if h.noLiveness || h.sess == nil {
 		return nil
 	}
-	_, err := h.sess.conn.Characteristic(dbusPath(h.live)).ReadValue(0)
+	_, err := h.sess.conn.Characteristic(dbus.ObjectPath(h.live)).ReadValue(0)
 	return err
 }
 
@@ -223,9 +224,9 @@ func looksLikeDisconnect(err error) bool {
 	if err == nil {
 		return false
 	}
-	s := err.Error()
+	s := strings.ToLower(err.Error())
 	for _, marker := range []string{"connection reset", "broken pipe", "no route", "transport endpoint is not connected"} {
-		if containsFold(s, marker) {
+		if strings.Contains(s, marker) {
 			return true
 		}
 	}
@@ -236,43 +237,6 @@ func looksLikeTimeout(err error) bool {
 	if err == nil {
 		return false
 	}
-	s := err.Error()
-	return containsFold(s, "timeout") || containsFold(s, "deadline") || containsFold(s, "resource temporarily unavailable")
+	s := strings.ToLower(err.Error())
+	return strings.Contains(s, "timeout") || strings.Contains(s, "deadline") || strings.Contains(s, "resource temporarily unavailable")
 }
-
-func containsFold(s, sub string) bool {
-	return indexFold(s, sub) >= 0
-}
-
-// indexFold is strings.Contains-with-ToLower without pulling in strings
-// here just for the import — strings is already imported elsewhere in
-// the package via other files.
-func indexFold(s, sub string) int {
-	// cheap path: both lowercase
-	for i := 0; i+len(sub) <= len(s); i++ {
-		match := true
-		for j := 0; j < len(sub); j++ {
-			a, b := s[i+j], sub[j]
-			if a >= 'A' && a <= 'Z' {
-				a += 32
-			}
-			if b >= 'A' && b <= 'Z' {
-				b += 32
-			}
-			if a != b {
-				match = false
-				break
-			}
-		}
-		if match {
-			return i
-		}
-	}
-	return -1
-}
-
-// dbusPath is the type alias trampoline for godbus's ObjectPath.
-// Pulling godbus into this file directly would create a circular-looking
-// import (cli already pulls it transitively); instead we keep paths as
-// strings here and convert at the boundary.
-func dbusPath(s string) dbus.ObjectPath { return dbus.ObjectPath(s) }
