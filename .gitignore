@@ -1,0 +1,16 @@
+# build artifacts
+/goatttool
+/shell-harness
+
+# editor
+*.swp
+*.swo
+.idea/
+.vscode/
+
+# fuzzing output
+fuzz-out-*/
+fuzz-out/
+
+# OS
+.DS_Store
