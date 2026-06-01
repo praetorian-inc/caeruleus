@@ -37,6 +37,8 @@ const (
 
 	// ATT opcodes — Core Spec Vol 3 Part F.
 	OpErrorResponse           = 0x01
+	OpReadRequest             = 0x0A
+	OpReadResponse            = 0x0B
 	OpWriteRequest            = 0x12
 	OpWriteResponse           = 0x13
 	OpPrepareWriteRequest     = 0x16
@@ -176,6 +178,18 @@ type Response struct {
 // AttErrorString exposes the Core-Spec code → name mapping for callers
 // that want to log a human-readable form alongside the numeric code.
 func AttErrorString(code uint8) string { return attErrorString(code) }
+
+// ReadRequest sends ATT Read Request (0x0A) for handle and parses the
+// response. Used as a cheap liveness probe in --no-bluez fuzz runs:
+// handle 0x0001 (the GATT primary service declaration on standard BLE
+// servers) is universally readable, so a successful ReadRequest there
+// is a strong signal the LE link is up.
+func (c *Conn) ReadRequest(handle uint16, timeout time.Duration) (Response, error) {
+	pdu := make([]byte, 3)
+	pdu[0] = OpReadRequest
+	binary.LittleEndian.PutUint16(pdu[1:3], handle)
+	return c.requestAndRead(pdu, OpReadRequest, timeout)
+}
 
 // WriteRequestEx is the structured-response variant of WriteRequest.
 // Transport errors (socket dead, timeout) return err != nil; an ATT

@@ -88,6 +88,7 @@ Install permanently via the manifest your distro uses for completions.`,
 		newAdapterCmd(),
 		newDoctorCmd(),
 		newFuzzCmd(),
+		newRawWriteCmd(),
 	)
 	return cmd
 }

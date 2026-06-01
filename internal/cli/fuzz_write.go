@@ -37,6 +37,7 @@ var fuzzWriteFlags struct {
 	types            string
 	include          string
 	raw              bool
+	noBoundarySeeds  bool
 	livenessHandle   string
 	livenessEvery    int
 	noLiveness       bool
@@ -116,6 +117,7 @@ Examples:
 	c.Flags().IntVar(&fuzzWriteFlags.targetResetAfter, "target-reset-after", 3, "fire --target-reset after this many consecutive liveness failures")
 	c.Flags().StringVar(&fuzzWriteFlags.outDir, "out", "", "corpus output directory (default ./fuzz-out-<ISO>/)")
 	c.Flags().BoolVar(&fuzzWriteFlags.noStateFeedback, "no-state-feedback", false, "treat every input as parentless; disable AFLNet-style queue")
+	c.Flags().BoolVar(&fuzzWriteFlags.noBoundarySeeds, "no-boundary-seeds", false, "in --raw mode, skip the auto-added MTU-boundary length seeds")
 	return c
 }
 
@@ -156,7 +158,10 @@ func runFuzzWrite(cmd *cobra.Command, args []string) error {
 	ctx, cancel := context.WithCancel(cmd.Context())
 	defer cancel()
 
-	// Connect once to read the seed and pin the target handle.
+	// Connect once to enumerate the tree, pin the target handle, auto-read
+	// the seed, and pick a liveness handle. In --raw mode we close this
+	// session afterward — the L2CAP harness runs solo and disconnects
+	// BlueZ explicitly if the kernel won't allow a second socket.
 	statusf("opening session to %s", addr)
 	openCtx, openCancel := ctxWithRootTimeout()
 	defer openCancel()
@@ -170,11 +175,19 @@ func runFuzzWrite(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	// Pick the liveness handle: explicit > first readable char in the tree.
+	// Pick the liveness handle: explicit > first readable char in the tree
+	// > 0x0001 (universal GATT primary service declaration) in --raw mode.
 	livenessHandle, err := pickLivenessHandle(sess, target.Handle, fuzzWriteFlags.livenessHandle)
-	if err != nil && !fuzzWriteFlags.noLiveness {
-		sess.close()
-		return fmt.Errorf("liveness probe selection: %w (use --no-liveness to skip)", err)
+	if err != nil {
+		if useRaw {
+			// --raw runs solo; the GATT primary service declaration at
+			// 0x0001 is universally readable on standards-compliant BLE
+			// servers and makes a fine default.
+			livenessHandle = 0x0001
+		} else if !fuzzWriteFlags.noLiveness {
+			sess.close()
+			return fmt.Errorf("liveness probe selection: %w (use --no-liveness to skip)", err)
+		}
 	}
 
 	// Gather seeds.
@@ -182,6 +195,13 @@ func runFuzzWrite(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		sess.close()
 		return fmt.Errorf("seed corpus: %w", err)
+	}
+	// In --raw mode, add boundary-length seeds aimed at single-PDU
+	// oversize bugs (the firmware-buffer-overflow class). The mutator
+	// would eventually grow inputs to these lengths on its own, but
+	// seeding them directly cuts that to iter 0..N where N = len(seeds).
+	if useRaw && !fuzzWriteFlags.noBoundarySeeds {
+		seeds = append(seeds, boundarySeeds()...)
 	}
 
 	// Set up output and trace.
@@ -226,10 +246,20 @@ func runFuzzWrite(cmd *cobra.Command, args []string) error {
 	}
 	defer h.Close()
 
-	// MaxLen cap should never exceed the negotiated MTU - 3. Read the MTU
-	// before handing the session off to the harness (L2CAP path closes it).
+	// MaxLen behaviour depends on transport.
+	//   - BlueZ Layer A: kernel enforces value ≤ MTU-3 anyway, so we cap
+	//     locally to keep the mutator productive (inputs BlueZ would
+	//     reject are wasted iterations).
+	//   - Raw L2CAP: the whole point is to *exceed* MTU-3 — that's where
+	//     single-PDU buffer-overflow bugs live. Default to a generous
+	//     cap (512) unless the user explicitly tuned --max-value-len.
 	maxLen := fuzzWriteFlags.maxValueLen
-	if !useRaw {
+	switch {
+	case useRaw:
+		if !cmd.Flags().Changed("max-value-len") {
+			maxLen = 512
+		}
+	default:
 		if mtu, err := sess.conn.Characteristic(target.Path).MTU(); err == nil && mtu > 3 {
 			cap := int(mtu) - 3
 			if maxLen <= 0 || cap < maxLen {
@@ -347,6 +377,27 @@ func parseFuzzTypes(s string) ([]engine.Op, error) {
 		return nil, fmt.Errorf("--type: empty")
 	}
 	return ops, nil
+}
+
+// boundarySeeds returns the curated MTU-boundary length seeds added to
+// the initial corpus in --raw mode. Targets that copy ATT values into a
+// fixed buffer without enforcing the negotiated MTU often overflow at
+// lengths just above MTU-3 (the spec's max single-PDU write payload).
+// These seeds put the mutator at the interesting threshold from iter 0.
+//
+// Pattern byte is 0x41 ('A') — easy to spot in pcaps and unlikely to
+// collide with structural framing in the target's parser.
+func boundarySeeds() [][]byte {
+	lengths := []int{244, 245, 246, 247, 248, 252, 253, 254, 255, 256, 511, 512}
+	out := make([][]byte, 0, len(lengths))
+	for _, n := range lengths {
+		b := make([]byte, n)
+		for i := range b {
+			b[i] = 'A'
+		}
+		out = append(out, b)
+	}
+	return out
 }
 
 // parseFuzzInclude parses --include (Phase 1b) into extra Ops to fold
