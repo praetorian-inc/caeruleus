@@ -11,6 +11,7 @@ If you already use another BLE tool, jump to the row that matches your habit.
 | If you reach for... | for... | Try in caeruleus |
 |---|---|---|
 | `bettercap` `ble.recon` | finding devices | `caeruleus scan` |
+| `hcitool lescan` | LE device discovery | `caeruleus scan` (add `-t <secs>` for the window) |
 | `bettercap` `ble.enum <mac>` | listing services/chars | `caeruleus enumerate -b <mac> --values` |
 | `gatttool -I` / `-b <mac> -I` | an interactive session | `caeruleus shell -b <mac>` |
 | `gatttool --char-read-hnd 0x0013` | reading a handle | `caeruleus read -b <mac> -a 0x0013` |
