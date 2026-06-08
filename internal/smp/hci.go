@@ -38,6 +38,7 @@ const (
 
 	// HCI command opcodes (OGF<<10 | OCF).
 	cmdReset              = 0x0c03
+	cmdSetEventMask       = 0x0c01
 	cmdDisconnect         = 0x0406
 	cmdLESetEventMask     = 0x2001
 	cmdLECreateConn       = 0x200d
@@ -149,12 +150,22 @@ func (d *Dev) readPacket(timeout time.Duration) (byte, []byte, error) {
 	return buf[0], append([]byte(nil), buf[1:rn]...), nil
 }
 
-// reset issues HCI Reset and waits for its Command Complete.
+// reset issues HCI Reset, then enables event delivery (the post-reset default
+// event mask omits the LE Meta event, so LE Connection Complete would never
+// reach the host).
 func (d *Dev) reset() error {
 	if err := d.sendCmd(cmdReset, nil); err != nil {
 		return fmt.Errorf("HCI Reset: %w", err)
 	}
-	return d.waitCmdComplete(cmdReset, 2*time.Second)
+	if err := d.waitCmdComplete(cmdReset, 2*time.Second); err != nil {
+		return err
+	}
+	// Enable all events including the LE Meta event (bit 61).
+	mask := []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x3f}
+	if err := d.sendCmd(cmdSetEventMask, mask); err != nil {
+		return err
+	}
+	return d.waitCmdComplete(cmdSetEventMask, 2*time.Second)
 }
 
 // waitCmdComplete drains events until a Command Complete (or Command Status)
@@ -245,7 +256,16 @@ func (d *Dev) Connect(addr, addrType string, timeout time.Duration) error {
 		if err != nil {
 			return err
 		}
-		if typ != pktEvent || len(data) < 2 || data[0] != evtLEMeta {
+		if typ != pktEvent || len(data) < 2 {
+			continue
+		}
+		// Surface a rejected LE Create Connection (Command Status) instead of
+		// silently waiting for a Connection Complete that will never come.
+		if data[0] == evtCmdStatus && len(data) >= 6 &&
+			binary.LittleEndian.Uint16(data[4:6]) == cmdLECreateConn && data[2] != 0 {
+			return fmt.Errorf("LE Create Connection rejected: HCI status 0x%02x", data[2])
+		}
+		if data[0] != evtLEMeta {
 			continue
 		}
 		params := data[2:]
@@ -322,11 +342,13 @@ func (d *Dev) ReadSMP(timeout time.Duration) ([]byte, error) {
 			if cid != cidSMP {
 				continue
 			}
+			// data: handle+flags(2) aclLen(2) | L2CAP: len(2) cid(2) payload
+			// The SMP payload starts at offset 8 and is l2len bytes long.
 			l2len := int(binary.LittleEndian.Uint16(data[4:6]))
-			if 4+l2len > len(data) {
-				l2len = len(data) - 4
+			if 8+l2len > len(data) {
+				l2len = len(data) - 8
 			}
-			return append([]byte(nil), data[8:4+l2len]...), nil
+			return append([]byte(nil), data[8:8+l2len]...), nil
 		}
 	}
 	return nil, errTimeout
