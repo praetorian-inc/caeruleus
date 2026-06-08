@@ -25,7 +25,7 @@ func newRoot() *cobra.Command {
 	// Preserve our grouped insertion order in help instead of alphabetising.
 	cobra.EnableCommandSorting = false
 
-	const desc = `caeruleus is a small command-line client for BLE GATT servers.
+	const desc = `caeruleus is a command-line client for BLE GATT servers.
 
 It talks to bluetoothd over D-Bus (BlueZ Adapter1/Device1/GattCharacteristic1)
 and provides subcommands for scanning, enumerating, reading, writing, and
