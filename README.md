@@ -1,6 +1,6 @@
 # Caeruleus
 
-Caeruleus is a hardware-agnostic BLE security testing toolkit for Linux/BlueZ, implemented as a single Go binary (`caeruleus`). It covers the full interaction-to-assessment lifecycle — scan, enumerate, read/write/notify, coverage-guided fuzzing, and structured security assessment — talking to peripherals directly over BlueZ D-Bus and raw L2CAP/HCI sockets. A [Claude Code](https://docs.anthropic.com/en/docs/claude-code) skill (`.claude/skills/caeruleus/`) orchestrates the binary's `-o json` output into assessment workflows and reports.
+Caeruleus is a hardware-agnostic BLE security testing toolkit for Linux/BlueZ, implemented as a single Go binary (`caeruleus`). It covers the full interaction-to-assessment lifecycle — scan, enumerate, read/write/notify, coverage-guided fuzzing, and structured security assessment — talking to peripherals directly over BlueZ D-Bus and raw L2CAP/HCI sockets. A portable [Agent Skill](https://agentskills.io) (`.claude/skills/caeruleus/`) orchestrates the binary's `-o json` output into assessment workflows and reports, and works with any Agent Skills-compatible agent.
 
 *caeruleus* — Latin for "blue"
 
@@ -9,7 +9,7 @@ Caeruleus is a hardware-agnostic BLE security testing toolkit for Linux/BlueZ, i
 ## Architecture
 
 ```
-Claude Code Agent  ──drives──►  caeruleus skill (.claude/skills/caeruleus/SKILL.md)
+AI agent (Agent Skills)  ──drives──►  caeruleus skill (.claude/skills/caeruleus/SKILL.md)
                                       │  shells out, consumes -o json
                                       ▼
                          caeruleus (Go binary, this repo)
@@ -35,7 +35,7 @@ caeruleus/
 │   └── fuzz/             # engine, mutator, AFLNet-style oracle, corpus, trace
 ├── caeruleus-target/     # deliberately-vulnerable nRF52840 DUT firmware
 ├── docs/                 # fuzzing-plan.md, ux-improvements.md
-└── .claude/skills/       # the Go-driven Claude Code skill
+└── .claude/skills/       # the Go-driven Agent Skill (portable; agentskills.io format)
 ```
 
 ## Build

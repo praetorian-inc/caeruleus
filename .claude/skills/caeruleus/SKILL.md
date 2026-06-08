@@ -1,14 +1,15 @@
 ---
 name: caeruleus
-description: Use when performing hardware-agnostic BLE security testing on Linux/BlueZ - device scanning, GATT enumeration, read/write/notify interaction, coverage-guided fuzzing, and security assessment (unauthenticated read/write exposure, encryption enforcement, DFU entry, write-without-response abuse, connection parameters). Drives the single Go `caeruleus` binary; no Python/MCP server, no external tool wrapping.
-allowed-tools: Bash, Read
+description: Use when performing hardware-agnostic BLE security testing on Linux/BlueZ - device scanning, GATT enumeration, read/write/notify interaction, coverage-guided fuzzing, and security assessment (unauthenticated read/write exposure, encryption enforcement, DFU entry, write-without-response abuse, connection parameters). Drives the single Go `caeruleus` binary; no separate server process, no external tool wrapping.
+compatibility: Linux with BlueZ (bluetoothd) and a standard BLE adapter; build with the Go toolchain (1.25+). Some commands require root (raw HCI/L2CAP sockets). Harness-agnostic — usable from any Agent Skills-compatible agent.
+allowed-tools: Bash Read
 ---
 
 # Caeruleus BLE Security Testing (Go)
 
 **A single statically-linked Go binary (`caeruleus`) that talks to BLE peripherals through BlueZ D-Bus and raw L2CAP/HCI sockets. Every subcommand supports `-o json` for machine consumption.** This skill is the orchestration layer: it sequences the binary's commands into assessment workflows and correlates their JSON findings into a report.
 
-Scope is deliberately **hardware-agnostic and self-contained**: it needs only a standard BLE adapter and BlueZ. It does not require Python, an MCP server, sniffer hardware, or an ESP32 relay, and it never shells out to other tools.
+Scope is deliberately **hardware-agnostic and self-contained**: it needs only a standard BLE adapter and BlueZ. It does not require Python, a separate server process, sniffer hardware, or an ESP32 relay, and it never shells out to other tools.
 
 ## When to Use
 
