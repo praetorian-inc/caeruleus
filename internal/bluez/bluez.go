@@ -431,9 +431,16 @@ func (d *Device) Disconnect() error {
 	return d.obj.CallWithContext(ctx, IfaceDevice+".Disconnect", 0).Err
 }
 
-// Pair invokes BlueZ Device1.Pair. Best-effort - many peripherals don't require pairing.
+// PairTimeout bounds Device1.Pair. Pairing is a multi-step SMP exchange and on
+// peripherals with very lax connection parameters each round-trip can take
+// seconds, so it gets a far more generous budget than a single GATT op.
+var PairTimeout = 60 * time.Second
+
+// Pair invokes BlueZ Device1.Pair. Bounded by PairTimeout: some BlueZ versions
+// complete the bond but leave the call outstanding, so callers should read
+// Paired()/Bonded() afterward rather than relying solely on this returning nil.
 func (d *Device) Pair() error {
-	ctx, cancel := context.WithTimeout(context.Background(), CallTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), PairTimeout)
 	defer cancel()
 	return d.obj.CallWithContext(ctx, IfaceDevice+".Pair", 0).Err
 }
