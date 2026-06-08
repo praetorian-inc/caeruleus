@@ -34,7 +34,8 @@ caeruleus/
 │   ├── bdaddr/           # adapter BD_ADDR read/spoof (vendor HCI)
 │   └── fuzz/             # fuzzing: mutation engine, corpus, crash/hang triage
 ├── skills/caeruleus/     # the Go-driven Agent Skill (portable; agentskills.io format)
-├── caeruleus-target/     # deliberately-vulnerable nRF52840 DUT firmware
+├── caeruleus-target/     # deliberately-vulnerable nRF52840 DUT firmware (no auth)
+├── caeruleus-target-secure/  # second DUT: enforced pairing/encryption + buttonless DFU
 └── docs/                 # fuzzing-plan.md, ux-improvements.md
 ```
 
