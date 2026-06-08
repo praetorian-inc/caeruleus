@@ -29,11 +29,22 @@ func attemptPair(ctx context.Context, addr string) (pairAttempt, error) {
 	}
 	defer conn.Close()
 
+	// BlueZ needs a registered agent to complete pairing (even Just Works).
+	// Register a NoInputNoOutput auto-accept agent for the duration of this
+	// pairing only.
+	if cleanup, e := conn.RegisterPairingAgent(); e == nil {
+		defer cleanup()
+	} else {
+		logf("pairing agent registration failed: %v", e)
+	}
+
 	dev := conn.Device(addr)
 	if root.addrType != "" {
 		_ = dev.SetAddressType(root.addrType)
 	}
-	if err := dev.Connect(ctx, time.Duration(root.timeout)*time.Second); err != nil {
+	// Pairing needs only the ACL link, not full GATT discovery (which is slow
+	// on lax-conn-param peripherals), so connect link-only.
+	if err := dev.ConnectLink(ctx, time.Duration(root.timeout)*time.Second); err != nil {
 		return pairAttempt{}, fmt.Errorf("connect before pair: %w", err)
 	}
 	defer func() {
@@ -42,8 +53,15 @@ func attemptPair(ctx context.Context, addr string) (pairAttempt, error) {
 		}
 	}()
 
-	pa := pairAttempt{pairErr: dev.Pair()}
+	perr := dev.Pair()
+	pa := pairAttempt{}
 	pa.paired, _ = dev.Paired()
+	if !pa.paired {
+		// Only surface the error if we did NOT end up paired; some BlueZ
+		// versions complete the bond but leave Pair() outstanding (it returns
+		// a timeout), which is not a failure.
+		pa.pairErr = perr
+	}
 	if b, e := dev.Bonded(); e == nil {
 		pa.bonded = &b
 	}

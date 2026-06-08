@@ -219,6 +219,38 @@ func (d *Device) Connect(ctx context.Context, timeout time.Duration) error {
 	}
 }
 
+// ConnectLink establishes the ACL link and waits for Connected=true, WITHOUT
+// waiting for GATT ServicesResolved. Pairing and other link-level operations
+// need only the link, not the resolved attribute table - and full GATT
+// discovery can be very slow on peripherals with lax connection parameters,
+// so waiting for it would needlessly time out.
+func (d *Device) ConnectLink(ctx context.Context, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	if err := d.connectOnce(ctx); err != nil {
+		if !IsTransientError(err) {
+			return err
+		}
+		time.Sleep(300 * time.Millisecond)
+		if err := d.connectOnce(ctx); err != nil {
+			return err
+		}
+	}
+	t := time.NewTicker(100 * time.Millisecond)
+	defer t.Stop()
+	for {
+		if c, _ := d.Connected(); c {
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("ConnectLink: %w", ctx.Err())
+		case <-t.C:
+		}
+	}
+}
+
 // connectOnce is one connect attempt: ensure the Device1 exists, then call
 // Device1.Connect if not already connected. Errors are wrapped with a hint
 // when they match a well-known opaque kernel/BlueZ message that has a known
@@ -394,12 +426,16 @@ func (d *Device) WaitServicesResolved(ctx context.Context) error {
 
 // Disconnect tears down the ACL link.
 func (d *Device) Disconnect() error {
-	return d.obj.Call(IfaceDevice+".Disconnect", 0).Err
+	ctx, cancel := context.WithTimeout(context.Background(), CallTimeout)
+	defer cancel()
+	return d.obj.CallWithContext(ctx, IfaceDevice+".Disconnect", 0).Err
 }
 
 // Pair invokes BlueZ Device1.Pair. Best-effort - many peripherals don't require pairing.
 func (d *Device) Pair() error {
-	return d.obj.Call(IfaceDevice+".Pair", 0).Err
+	ctx, cancel := context.WithTimeout(context.Background(), CallTimeout)
+	defer cancel()
+	return d.obj.CallWithContext(ctx, IfaceDevice+".Pair", 0).Err
 }
 
 // CancelPairing aborts an in-progress Device1.Pair. Safe to call when no
@@ -492,14 +528,23 @@ func (c *Characteristic) Flags() ([]string, error) {
 	return s, nil
 }
 
+// CallTimeout bounds individual GATT D-Bus operations (ReadValue / WriteValue).
+// Without it these can hang indefinitely: reading a characteristic the
+// peripheral guards with encryption makes BlueZ try to elevate security
+// (pair), and with no pairing agent registered the synchronous call never
+// returns. A bounded call surfaces that as a timeout the caller can classify.
+var CallTimeout = 15 * time.Second
+
 // ReadValue executes GattCharacteristic1.ReadValue with an empty options dict.
 func (c *Characteristic) ReadValue(offset uint16) ([]byte, error) {
 	opts := map[string]dbus.Variant{}
 	if offset != 0 {
 		opts["offset"] = dbus.MakeVariant(offset)
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), CallTimeout)
+	defer cancel()
 	var out []byte
-	if err := c.obj.Call(IfaceCharacteristic+".ReadValue", 0, opts).Store(&out); err != nil {
+	if err := c.obj.CallWithContext(ctx, IfaceCharacteristic+".ReadValue", 0, opts).Store(&out); err != nil {
 		return nil, fmt.Errorf("ReadValue: %w", err)
 	}
 	return out, nil
@@ -520,7 +565,9 @@ func (c *Characteristic) WriteValue(value []byte, wtype WriteType) error {
 	if wtype != "" {
 		opts["type"] = dbus.MakeVariant(string(wtype))
 	}
-	return c.obj.Call(IfaceCharacteristic+".WriteValue", 0, value, opts).Err
+	ctx, cancel := context.WithTimeout(context.Background(), CallTimeout)
+	defer cancel()
+	return c.obj.CallWithContext(ctx, IfaceCharacteristic+".WriteValue", 0, value, opts).Err
 }
 
 // StartNotify enables notifications/indications on the characteristic.

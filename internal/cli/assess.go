@@ -110,6 +110,12 @@ func classifyAccessErr(err error) accessClass {
 	case containsAnyLower(s, "not authorized", "authoriz", "not paired",
 		"insufficient authentication", "insufficient encryption", "authentication"):
 		return accessAuth
+	// A declared-readable/writable attribute whose access cannot complete on an
+	// unpaired link manifests as a timeout (BlueZ stuck elevating security with
+	// no pairing agent) or an "in progress" follow-on error. For assessment
+	// purposes that is an authentication gate, not a transient fault.
+	case containsAnyLower(s, "context deadline exceeded", "operation already in progress", "in progress"):
+		return accessAuth
 	case containsAnyLower(s, "not permitted", "read not permitted",
 		"write not permitted", "not supported", "notsupported"):
 		return accessDenied
