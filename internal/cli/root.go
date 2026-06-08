@@ -30,11 +30,7 @@ func newRoot() *cobra.Command {
 It talks to bluetoothd over D-Bus (BlueZ Adapter1/Device1/GattCharacteristic1)
 and provides subcommands for scanning, enumerating, reading, writing, and
 subscribing to notifications. Privileged subcommands (monitor, bdaddr,
-mtu --set/--reset) require root.
-
-Shell completion: source the cobra-generated script for your shell, e.g.
-  source <(caeruleus completion bash)    # or: zsh, fish, powershell
-Install permanently via the manifest your distro uses for completions.`
+mtu --set/--reset) require root.`
 
 	// Show the wordmark only when the terminal is wide enough for it.
 	long := desc
