@@ -56,10 +56,10 @@ const (
 	// HCI event decoding — Core Spec Vol 4 Part E. The LE Meta event (0x3E)
 	// carries the LE subevents we use to recover connection parameters that
 	// BlueZ does not surface over D-Bus.
-	hciEvtLEMeta           = 0x3E
-	leSubConnComplete      = 0x01
-	leSubConnUpdate        = 0x03
-	leSubEnhConnComplete   = 0x0A
+	hciEvtLEMeta         = 0x3E
+	leSubConnComplete    = 0x01
+	leSubConnUpdate      = 0x03
+	leSubEnhConnComplete = 0x0A
 )
 
 // Notification is a parsed inbound ATT Handle Value Notification or Indication.

@@ -1,327 +1,160 @@
 ---
 name: caeruleus
-description: Use when performing BLE security testing - device scanning, GATT enumeration, fuzzing, authentication bypass, MITM relay, DFU testing, and evidence capture via persistent Python server with TypeScript CLI wrappers.
+description: Use when performing hardware-agnostic BLE security testing on Linux/BlueZ - device scanning, GATT enumeration, read/write/notify interaction, coverage-guided fuzzing, and security assessment (unauthenticated read/write exposure, encryption enforcement, DFU entry, write-without-response abuse, connection parameters). Drives the single Go `caeruleus` binary; no Python/MCP server, no external tool wrapping.
 allowed-tools: Bash, Read
 ---
 
-# Caeruleus BLE Security Testing
+# Caeruleus BLE Security Testing (Go)
 
-**Direct BLE device security testing via persistent Python server with TypeScript CLI wrappers. No MCP server dependency.**
+**A single statically-linked Go binary (`caeruleus`) that talks to BLE peripherals through BlueZ D-Bus and raw L2CAP/HCI sockets. Every subcommand supports `-o json` for machine consumption.** This skill is the orchestration layer: it sequences the binary's commands into assessment workflows and correlates their JSON findings into a report.
+
+Scope is deliberately **hardware-agnostic and self-contained**: it needs only a standard BLE adapter and BlueZ. It does not require Python, an MCP server, sniffer hardware, or an ESP32 relay, and it never shells out to other tools.
 
 ## When to Use
 
-Use this skill when:
+- Interacting with a BLE peripheral: scan, enumerate GATT, read/write characteristics, subscribe to notifications.
+- Assessing a peripheral's security posture: what an unpaired attacker can read/write, whether encryption is enforced, DFU exposure, write-without-response resilience, connection parameters.
+- Fuzzing a writable characteristic (coverage-guided, AFL-style corpus + crash/hang triage).
+- Recovering a wedged adapter / stuck BlueZ connection during testing.
 
-- Testing BLE devices during IoT security assessments
-- Scanning for and enumerating BLE devices
-- Probing GATT characteristics and permissions
-- Fuzzing writable characteristics for crashes
-- Testing pairing, encryption, and authentication bypass
-- Performing MITM relay attacks via ESP32-Gattacker
-- Testing Nordic DFU firmware update security
-- Replaying captured write operations
-- Generating security reports and remediation guidance
+If the task needs off-path sniffing of *other* devices' traffic, or a MITM relay/peripheral clone, that is out of scope for this tool — use dedicated sniffer/relay hardware separately.
 
-## Prerequisites
+## Prerequisites & Build
 
-### System Requirements
+- **Linux with BlueZ** (`bluetoothd` running) and a BLE adapter (default `hci0`).
+- **Go toolchain** (1.25+) to build, or a prebuilt binary.
 
-- **Linux with BlueZ stack** (bluetoothctl, hcitool, hciconfig)
-- **Python 3.10+** with `bleak`, `bluepy`, `pyyaml`, `scapy`
-- **Node.js 20+** with `npx tsx` available
-- **BLE adapter** (hci0 by default)
-
-Install Python dependencies:
-```bash
-pip install -r requirements.txt
-```
-
-On Linux, ensure the Bluetooth service is running and the adapter is up before scanning:
-```bash
-sudo systemctl start bluetooth
-sudo hciconfig hci0 up
-```
-
-### Optional Hardware
-
-- **Ubertooth One** / **nRF52 Sniffer** / **Sniffle** — for passive BLE sniffing
-- **ESP32-Gattacker** (ESP32-S3) — for MITM relay and notification spoofing
-
-## Architecture
-
-```
-Claude Code Agent
-    |
-    v
-TypeScript CLI Wrappers (*.ts)
-    | stdin/stdout (YAML protocol)
-    v
-Persistent Python Server (caeruleus-server.py)
-    |
-    v
-BlueZ / bleak / bluepy - BLE Device via HCI adapter
-
-Optional:
-caeruleus-sniffer.py - RF capture via Ubertooth/nRF52/Sniffle
-ESP32-Gattacker      - MITM relay via WebSocket (ws://1.3.3.7/ws)
-```
-
-- **First call**: ~2-4 seconds (BLE adapter init)
-- **First `enumerate-gatt`**: ~10-30 seconds (BLE connection + full GATT service discovery). Use a Bash timeout of at least 90000ms. The wrapper auto-retries once on timeout.
-- **Subsequent calls**: ~50-200ms (connection reuse)
-
-## Available Tools
-
-### Phase 1: Reconnaissance
-
-| Wrapper | Purpose | Key Parameters |
-| --- | --- | --- |
-| `scan-devices` | Scan for BLE devices | `duration`, `adapter`, `active`, `target_mac` |
-| `enumerate-gatt` | Enumerate GATT services/characteristics | `mac_address`, `mac_type` |
-| `probe-characteristics` | Probe read/write permissions | `timeout_per_char` |
-| `fingerprint-device` | Fingerprint chipset/firmware (offline) | `device_inventory_path` |
-| `analyze-advertisements` | Analyze advertisement data (offline) | `device_inventory_path` |
-
-### Phase 2: Protocol Analysis
-
-| Wrapper | Purpose | Key Parameters |
-| --- | --- | --- |
-| `test-pairing` | Test pairing enforcement | `mac_address`, `test_enforcement`, `test_legacy_fallback` |
-| `test-encryption` | Test encryption requirements | `mac_address` |
-| `subscribe-notifications` | Monitor notifications/indications | `mac_address`, `uuid`, `duration` |
-| `audit-gatt-profile` | Audit GATT against BLE spec (offline) | `gatt_map_path` |
-| `sniff-decode` | Capture & decode BLE packets | `target_mac`, `duration`, `mode` |
-| `analyze-connection-params` | Analyze connection parameters | `mac_address` |
-
-### Phase 3: Active Testing
-
-| Wrapper | Purpose | Key Parameters |
-| --- | --- | --- |
-| `fuzz-characteristic` | Fuzz writable characteristics | `mac_address`, `uuid`, `strategy`, `iterations` |
-| `test-wwr-abuse` | Test write-without-response abuse | `mac_address`, `uuids`, `rapid_fire_count`, `max_write_sizes` |
-| `test-auth-bypass` | Test authentication bypass | `mac_address` |
-| `replay-writes` | Replay captured write operations | `mac_address`, `writes`, `unpair_before_replay` |
-| `test-dfu` | Test Nordic DFU security | `mac_address`, `test_unsigned`, `test_buttonless` |
-| `mitm-relay` | MITM relay via ESP32-Gattacker | `target_mac`, `enable_hooks`, `capture_duration_seconds` |
-| `spoof-notifications` | Spoof notification values via MITM | `target_mac`, `spoofed_values` |
-| `generate-fuzz-harness` | Generate fuzz test harness (offline) | `gatt_map_path` |
-
-### Phase 4: Reporting & Evidence
-
-| Wrapper | Purpose | Key Parameters |
-| --- | --- | --- |
-| `visualize-gatt` | Generate GATT hierarchy visualization (offline) | `gatt_map_path`, `format` |
-| `correlate-findings` | Correlate findings across phases (offline) | `engagement_dir` |
-| `map-cves` | Map chipset to known CVEs (offline) | `fingerprint_path` |
-| `assemble-evidence` | Assemble evidence package (offline) | `engagement_dir` |
-| `generate-remediation` | Generate remediation guide (offline) | `findings_path` |
-| `generate-report` | Generate final security report (offline) | `engagement_dir` |
-
-### Standalone Utilities
-
-| Wrapper | Purpose | Key Parameters |
-| --- | --- | --- |
-| `read-characteristic` | Read a characteristic value | `uuid` |
-| `write-characteristic` | Write to a characteristic | `uuid`, `value_hex` or `value_ascii`, `response` |
-| `batch-read` | Read multiple characteristics in one session | `mac_address`, `uuids` or `reads` |
-| `batch-write` | Write to multiple characteristics in one session | `mac_address`, `writes` (entries accept `value_hex` or `value_ascii`), `delay_ms` |
-| `subscribe-raw` | Subscribe via raw L2CAP ATT socket (Linux) | `uuid`, `handle`, `write_value_hex`, `duration` |
-| `raw-att` | Execute raw ATT operations (MTU exchange, handle read/write, listen) | `mac_address`, `operations` |
-| `shutdown-server` | Gracefully stop the server (disconnects BLE first) | (none) |
-
-**When to use `batch-write`:** Ideal for brute-force challenges or bulk operations — generate an array of writes with `read_after_write: true` to test value ranges (e.g., 0x00-0xFF) in a single persistent connection, far faster than individual write+read calls in a loop.
-
-**When to use `subscribe-raw`:** Use when `subscribe-notifications` fails due to missing CCCD descriptors (common on CTF boards and non-compliant IoT firmware). Bypasses Bleak's D-Bus notification path and opens a direct L2CAP ATT socket. Also supports `subscribe-notifications` with `raw: true` to route through the same raw path with sensitive-data analysis. Note: raw subscribe disconnects Bleak temporarily; the server auto-reconnects afterward.
-
-**When to use `raw-att`:** Use for ATT-level operations that Bleak doesn't expose — MTU negotiation (`exchange_mtu`), handle-level reads/writes by numeric handle, and passive ATT traffic listening. The `operations` array accepts a sequence of `exchange_mtu`, `read`, `write`, and `listen` operations executed in order over a single L2CAP socket. Like `subscribe-raw`, this disconnects Bleak temporarily and auto-reconnects afterward.
-
-**NEVER use `pkill -f caeruleus-server` to stop the server.** Hard-killing the process leaves the BLE connection open at the BlueZ/kernel level, which blocks subsequent connections to single-connection devices (e.g., most BLE peripherals). Always use `shutdown-server` instead — it sends a BLE disconnect before exiting.
-
-## Usage
-
-**All wrapper paths are relative to this skill's base directory.** Set `SKILL_DIR` before running any wrapper:
+Build once from the repo root:
 
 ```bash
-SKILL_DIR=".claude/skills/caeruleus"
+make build          # produces ./caeruleus  (and: make harness, make test-unit)
 ```
 
-### Scan for BLE Devices
+Invoke as `./caeruleus` from the repo root, or copy it onto `PATH`. In examples below the binary is written `caeruleus`.
+
+### Root / privileges
+
+Most commands run unprivileged over D-Bus. These need **root** (raw HCI/L2CAP or system config):
+
+| Needs root | Why |
+|---|---|
+| `conn-params`, `monitor` | HCI monitor socket (CAP_NET_RAW + CAP_NET_ADMIN) |
+| `fuzz write --raw`, `cccd --raw`, `raw-write` | raw L2CAP ATT socket (CAP_NET_RAW) |
+| `mtu --set/--reset`, `bdaddr --set` | edits system config / vendor HCI commands |
+
+Run those with `sudo caeruleus …`. For unattended runs, a scoped sudoers drop-in avoids prompts:
 
 ```bash
-npx tsx "$SKILL_DIR/scan-devices.ts" '{"duration": 15}'
-npx tsx "$SKILL_DIR/scan-devices.ts" '{"duration": 10, "target_mac": "AA:BB:CC:DD:EE:FF"}'
+echo "$USER ALL=(root) NOPASSWD: $(command -v caeruleus || echo $PWD/caeruleus)" | sudo tee /etc/sudoers.d/caeruleus
+sudo chmod 0440 /etc/sudoers.d/caeruleus
 ```
 
-### Enumerate GATT Services
+(Remove with `sudo rm /etc/sudoers.d/caeruleus`. Note this grants passwordless root to that binary path.)
+
+## Global flags
+
+Apply to every subcommand:
+
+- `-b, --bdaddr XX:XX:XX:XX:XX:XX` — target peripheral (required by most commands).
+- `-i, --adapter hciN` — adapter (default `hci0`).
+- `--addr-type public|random` — force address type (auto if blank; some peripherals advertise as `random`).
+- `-t, --timeout N` — per-operation timeout, seconds (default 25).
+- `-o, --format text|json|jsonl` — **always use `json` when orchestrating**; `text` renders human tables.
+- `-v, --verbose` / `-q, --quiet` — stderr diagnostics / suppress status lines.
+
+## Command reference
+
+### Discovery & interaction
+| Command | Purpose |
+|---|---|
+| `scan [-t secs]` | LE discovery; `--new` hides cached devices. |
+| `recon -b A` | Passive device profile (DIS fingerprint, service map, GATT audit). |
+| `enumerate -b A [--values] [--compact]` | Full GATT tree; `--compact` is one line/char (LLM-friendly). |
+| `primary -b A` / `characteristics -b A` | gatttool-compatible service / characteristic listing. |
+| `read -b A (-a 0xHND \| -u UUID) [--watch --every D] [--extract]` | Read; `--extract` emits bare hex for piping. |
+| `write -b A (-a 0xHND\|-u UUID) (-n HEX \| -s STR) [--req] [--each-line]` | Write; `--req` forces write-with-response. |
+| `listen -b A -a 0xHND [--trigger-value HEX] [--duration D]` | Subscribe to notifications/indications. |
+| `cccd -b A (--char UUID\|--handle 0xHND) --enable notify\|indicate\|off [--raw]` | Manipulate the CCCD directly. |
+| `mtu -b A --show` | Show negotiated ATT MTU (`--set N` reconfigures bluetoothd; root). |
+| `shell -b A` / `batch -b A` / `serve`+`send` | Interactive REPL / stdin script / persistent warm-link daemon. |
+
+### Security assessment (structured findings)
+All emit `{address, test, summary, findings[]}`; findings carry `severity` (info/low/medium/high/critical), `handle`, `uuid`, `evidence`, `detail`. **These exit 0 even when issues are found** — findings are data.
+
+| Command | What it tests |
+|---|---|
+| `recon -b A` | Fingerprint + audit: DFU presence, exposed serial, custom services, hidden-readable characteristics. |
+| `assess auth-bypass -b A [--probe-write]` | What an unpaired attacker can read; secret-looking values escalate. `--probe-write` also tests unauthenticated writes (same-value write-back). |
+| `assess encryption -b A` | Unauthenticated baseline → pair → re-test: no-pairing exposure, enforcement, legacy fallback after unpair. |
+| `assess dfu -b A [--probe-entry]` | Detect 0xFE59 DFU + unauthenticated buttonless entry. `--probe-entry` is **destructive** (reboots target). |
+| `assess wwr -b A [--sizes ...] [--burst N]` | Write-without-response overflow sweep + rapid-fire burst with liveness probe (can crash a fragile target). |
+| `pair -b A` / `unpair -b A` | Establish / drop a bond (pairing rejection is recorded, not an error). |
+| `conn-params -b A` | Connection interval / peripheral latency / supervision timeout + ATT MTU (root). |
+
+### Fuzzing
+| Command | Purpose |
+|---|---|
+| `fuzz write -b A -a 0xHND [--type req\|cmd\|both] [--max-iter N] [--max-time D]` | Coverage-guided write fuzzing (AFL-style corpus, AFLNet state oracle, crash/hang triage). Output dir `fuzz-out-<ts>/`. |
+| `fuzz write … --raw [--include prep,exec]` | Drive raw L2CAP solo (oversized single-PDU + Prepare/Execute writes); root. |
+| `fuzz write … --target-reset "CMD" [--liveness-every N]` | Run a recovery shell command when the target wedges. |
+| `fuzz replay DIR/file [--op req\|cmd]` | Re-send a saved corpus/crash input to reproduce. |
+
+### Adapter & diagnostics
+| Command | Purpose |
+|---|---|
+| `doctor` | One-shot health check (bluetoothd, power, scan, MTU, address) with fixes; exit 2 on FAIL. |
+| `adapter power on\|off\|cycle` / `adapter info` | Soft adapter recovery / state. |
+| `disconnect -b A` / `forget -b A` | Drop link / purge BlueZ cache (clears stuck `Connected=true`). |
+| `bdaddr --show` / `--set MAC` | Read / spoof adapter BD_ADDR (root; vendor-specific). |
+| `monitor -b A [--handle 0xHND]` | Passive HCI decode of notifications BlueZ hides (root). |
+
+## Assessment methodology (recommended orchestration)
+
+Run in order, capturing each step's JSON, then synthesize. Reuse one warm link where possible; if a step wedges the device, run `disconnect`/`forget` or `adapter power cycle` before continuing.
 
 ```bash
-npx tsx "$SKILL_DIR/enumerate-gatt.ts" '{"mac_address": "AA:BB:CC:DD:EE:FF"}'
+A=CC:B6:0E:3C:97:0B          # target
+
+caeruleus doctor -o json                                   # 0. adapter sane?
+caeruleus recon              -b $A -o json > recon.json     # 1. profile + audit
+caeruleus assess auth-bypass -b $A -o json > auth.json      # 2. unauth read exposure
+caeruleus assess encryption  -b $A -o json > enc.json       # 3. encryption enforcement
+caeruleus assess dfu         -b $A -o json > dfu.json       # 4. DFU exposure (detect-only)
+sudo caeruleus conn-params   -b $A -o json > conn.json      # 5. timing profile
+# 6. (optional, can crash) write-without-response resilience:
+caeruleus assess wwr         -b $A -o json > wwr.json
+# 7. (optional, deep) fuzz a writable characteristic found above:
+caeruleus fuzz write -b $A -a 0x0015 --max-time 2m
 ```
 
-### Fuzz a Characteristic
+Then **correlate**: merge all `findings[]`, dedupe by `(uuid, title)`, rank by severity, and chain related findings into attack narratives (e.g. *auth-bypass read of a credentials characteristic* + *no encryption enforced* = unauthenticated credential disclosure). Use `recon`'s `profile` (manufacturer/model/firmware/serial) for chipset/CVE correlation and report context. Produce a Markdown report grouped by severity with evidence (`evidence` is a hex+ASCII preview) and remediation per finding type (enforce pairing/encryption, tighten permissions, authenticate DFU, validate write lengths).
 
-```bash
-npx tsx "$SKILL_DIR/fuzz-characteristic.ts" '{"mac_address": "AA:BB:CC:DD:EE:FF", "uuid": "2a00", "strategy": "boundary", "iterations": 500}'
+## Findings JSON schema
+
+```jsonc
+{
+  "address": "CC:B6:0E:3C:97:0B",
+  "test": "auth-bypass",
+  "summary": "readable-unauth=16 auth-required=0 ...",
+  "findings": [
+    {
+      "title": "Characteristic readable without authentication",
+      "severity": "high",                 // info|low|medium|high|critical
+      "handle": 19,                        // ATT handle (decimal in JSON)
+      "uuid": "00ca0001-bede-ad43-4145-52554c455500",
+      "evidence": "61646d696e... (\"admin:password123\")",
+      "detail": "Value retrieved over an unpaired, unencrypted link."
+    }
+  ]
+}
 ```
 
-### Test Pairing Security
+`recon` is the exception: it emits `{address, profile{...}, findings[]}`.
 
-```bash
-npx tsx "$SKILL_DIR/test-pairing.ts" '{"mac_address": "AA:BB:CC:DD:EE:FF"}'
-```
+## Operational notes
 
-### MITM Relay via ESP32-Gattacker
-
-Requires ESP32-Gattacker hardware on WiFi (default: ws://1.3.3.7/ws).
-```bash
-npx tsx "$SKILL_DIR/mitm-relay.ts" '{"target_mac": "AA:BB:CC:DD:EE:FF", "enable_hooks": true, "capture_duration_seconds": 120}'
-```
-
-### Test Nordic DFU Security
-
-```bash
-npx tsx "$SKILL_DIR/test-dfu.ts" '{"mac_address": "AA:BB:CC:DD:EE:FF"}'
-```
-
-**Important:** If the user asks to "test a BLE device" without specifying a target, first run `scan-devices` to show nearby devices and ask the user which MAC to target. Do not guess.
-
-## Environment Variables
-
-| Variable | Default | Description |
-| --- | --- | --- |
-| `CAERULEUS_PYTHON` | `python3` | Python interpreter path |
-| `CAERULEUS_ADAPTER` | `hci0` | BlueZ adapter |
-| `CAERULEUS_TRANSPORT` | `usb` | Transport type |
-| `CAERULEUS_DEVICE_ID` | (empty) | Specific adapter ID for multi-adapter |
-| `CAERULEUS_SNIFFER_HARDWARE` | `ubertooth` | Sniffer hardware type |
-
-## YAML Protocol
-
-```yaml
-# Request
-id: 1
-command: scan
-params:
-  duration: 10
-  active: false
----
-
-# Response (success)
-id: 1
-status: ok
-result:
-  device_count: 3
-  devices: [...]
----
-
-# Response (error)
-id: 1
-status: error
-error:
-  code: ADAPTER_NOT_FOUND
-  message: "BlueZ adapter hci0 not found"
-  recoverable: false
-  suggestion: "Check adapter with: hciconfig"
----
-```
-
-## Troubleshooting
-
-### Adapter Not Found
-
-```
-Error: ADAPTER_NOT_FOUND - BlueZ adapter hci0 not found
-```
-
-**Fix:** Verify adapter with `hciconfig`. If using a different adapter, set `CAERULEUS_ADAPTER=hci1`.
-
-### Device Not Found
-
-```
-Error: DEVICE_NOT_FOUND - Target not in scan range
-```
-
-**Fix:** Run `scan-devices` to see nearby devices. Ensure target is powered on and advertising. If the device was previously connected, check for orphaned BlueZ connections (see below).
-
-### Orphaned BlueZ Connection
-
-If a wrapper process is killed (e.g. `pkill`, Ctrl-C on a background task) while the server holds a BLE connection, the kernel-level HCI link can survive even after the Python server exits. This blocks single-connection peripherals from advertising or accepting new connections.
-
-**Diagnose:**
-```bash
-bluetoothctl devices Connected
-```
-
-**Fix:**
-```bash
-bluetoothctl disconnect <MAC>
-```
-
-**Root cause:** Killing the Node.js wrapper does not stop the detached Python server, and if Bleak is stuck (e.g. mid-`start_notify` on a CCCD-less device), `_cleanup_ble` previously hung on `_client.disconnect()` and never reached the `bluetoothctl` fallback. The server now applies a 5-second timeout to the Bleak disconnect to ensure the fallback always runs. **Always use `shutdown-server` instead of `pkill` to stop the server.**
-
-### TimeoutError on First Connection
-
-```
-Error: TIMEOUT - TimeoutError()
-```
-
-The `enumerate-gatt` wrapper auto-retries once on timeout, so this should be transparent. If it still fails after the automatic retry, check that the device is powered on and in range with `scan-devices`.
-
-### Connection Lost
-
-```
-Error: CONNECTION_LOST - BLE link dropped
-```
-
-**Fix:** The client auto-reconnects. If persistent, move closer to the device or check for interference.
-
-### Device Crashed During Fuzz
-
-```
-Error: DEVICE_CRASHED - Target crashed during fuzz
-```
-
-**Fix:** Power-cycle the target device. The server auto-detects crash and waits for reconnection.
-
-### ESP32-Gattacker Not Reachable
-
-```
-Error: WebSocket connection timeout
-```
-
-**Fix:** Ensure ESP32-Gattacker is powered on and connected to WiFi AP (ssid: ESP_WIFI, pass: gattattack). Web UI at http://1.3.3.7.
-
-## Concurrency Rule
-
-**Sequential when interacting with the DUT. Parallel only on offline artifacts.**
-
-BLE has a single active connection — two operations simultaneously would corrupt state. Offline scripts (Phase 4) can run in parallel since they only read JSON artifacts.
-
-## Integration
-
-### Called By
-
-- Manual invocation for BLE device security testing
-- Skills requiring BLE runtime instrumentation
-
-### Requires (invoke before starting)
-
-None — Dependencies installed via `pip install -r requirements.txt` and `npm install`.
-
-### Calls (during execution)
-
-None — Terminal skill that provides BLE security testing capabilities.
-
-### Pairs With (conditional)
-
-| Skill | Trigger | Purpose |
-| --- | --- | --- |
-| `vault-finding` | When security issues found | Document findings from Caeruleus analysis |
-| `plextrac-finding` | When reporting to PlexTrac | Create findings with evidence |
-
-## References
-
-- [README](README.md) - Development guide and testing instructions
-- [Bluetooth Core Spec v5.3](https://www.bluetooth.com/specifications/specs/core-specification-5-3/) - BLE specification
-- [bleak Documentation](https://bleak.readthedocs.io/) - Python BLE library
-- [ESP32-Gattacker](https://github.com/p0px/ESP32-Gattacker) - MITM hardware firmware
+- **Random vs public addresses:** if connect fails, pass `--addr-type random` (or `public`). `scan` shows each device's type.
+- **Stuck state:** "Operation already in progress" / `Connected=true` that won't clear → `caeruleus forget -b A` then retry, or `caeruleus adapter power cycle`. `caeruleus doctor` suggests the fix.
+- **Single-connection peripherals:** many small devices accept one central at a time. Disconnect (the tool does this on exit) before re-running, or use `serve`/`send` to hold one warm link across many operations.
+- **Pairing rejection is a result,** not a failure: `pair`/`assess encryption` exit 0 and record it.
+- **`assess wwr` and `assess dfu --probe-entry` are active/destructive** — only run against targets you can recover (they may reset the device).

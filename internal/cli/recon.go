@@ -63,14 +63,14 @@ the fingerprint / report layer.`,
 
 // adopted 16-bit UUIDs we surface in the profile.
 const (
-	uuidGAPName     = 0x2A00
-	uuidPPCP        = 0x2A04
+	uuidGAPName      = 0x2A00
+	uuidPPCP         = 0x2A04
 	uuidManufacturer = 0x2A29
-	uuidModel       = 0x2A24
-	uuidSerial      = 0x2A25
-	uuidFirmwareRev = 0x2A26
-	uuidHardwareRev = 0x2A27
-	uuidSoftwareRev = 0x2A28
+	uuidModel        = 0x2A24
+	uuidSerial       = 0x2A25
+	uuidFirmwareRev  = 0x2A26
+	uuidHardwareRev  = 0x2A27
+	uuidSoftwareRev  = 0x2A28
 )
 
 func runRecon(cmd *cobra.Command, args []string) error {
@@ -231,11 +231,4 @@ func printReconText(res reconResult) {
 		out := assessResult{Address: res.Address, Test: "recon-audit", Findings: res.Findings}
 		_ = emitAssess(out)
 	}
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }
