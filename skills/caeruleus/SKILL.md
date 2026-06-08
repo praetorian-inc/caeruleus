@@ -55,6 +55,9 @@ Add `-o json` to any command to get machine-readable output for scripting or rep
 | `listen -b A -a 0xHND [--trigger-value HEX] [--duration D]` | Subscribe to notifications/indications. |
 | `cccd -b A (--char UUID\|--handle 0xHND) --enable notify\|indicate\|off [--raw]` | Manipulate the CCCD directly. |
 | `mtu -b A --show` | Show negotiated ATT MTU (`--set N` reconfigures bluetoothd; root). |
+| `pair -b A` / `unpair -b A` | Establish / drop a bond (pairing rejection is recorded, not an error). |
+| `conn-params -b A` | Connection interval / peripheral latency / supervision timeout + ATT MTU (root). |
+| `disconnect -b A` / `forget -b A` | Drop the link / purge BlueZ cache (clears stuck `Connected=true`). |
 | `shell -b A` / `batch -b A` / `serve`+`send` | Interactive REPL / stdin script / persistent warm-link daemon. |
 
 ### Security assessment (structured findings)
@@ -67,8 +70,6 @@ All emit `{address, test, summary, findings[]}`; findings carry `severity` (info
 | `assess encryption -b A` | Unauthenticated baseline, pair, re-test: no-pairing exposure, enforcement, legacy fallback after unpair. |
 | `assess dfu -b A [--probe-entry]` | Detect 0xFE59 DFU + unauthenticated buttonless entry. `--probe-entry` is **destructive** (reboots target). |
 | `assess wwr -b A [--sizes ...] [--burst N]` | Write-without-response overflow sweep + rapid-fire burst with a liveness probe (can crash a fragile target). |
-| `pair -b A` / `unpair -b A` | Establish / drop a bond (pairing rejection is recorded, not an error). |
-| `conn-params -b A` | Connection interval / peripheral latency / supervision timeout + ATT MTU (root). |
 
 `check-auth` and `recon` use the Praetorian [Titus](https://github.com/praetorian-inc/titus) rule set to flag values that are structured secrets (API keys, tokens, private keys). Plain credential-looking text (e.g. `user:pass`) is reported as readable-without-auth but not auto-escalated.
 
@@ -85,7 +86,6 @@ All emit `{address, test, summary, findings[]}`; findings carry `severity` (info
 |---|---|
 | `doctor` | One-shot health check (bluetoothd, power, scan, MTU, address); exit 2 on FAIL. |
 | `adapter power on\|off\|cycle` / `adapter info` | Soft adapter recovery / state. |
-| `disconnect -b A` / `forget -b A` | Drop link / purge BlueZ cache (clears stuck `Connected=true`). |
 | `bdaddr --show` / `--set MAC` | Read / spoof adapter BD_ADDR (root; vendor-specific). |
 | `monitor -b A [--handle 0xHND]` | Passive HCI decode of notifications BlueZ hides (root). |
 

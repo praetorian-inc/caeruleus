@@ -96,15 +96,16 @@ mtu --set/--reset) require root.`
 	add("interact",
 		newScanCmd(), newEnumerateCmd(), newPrimaryCmd(), newCharacteristicsCmd(),
 		newReadCmd(), newWriteCmd(), newRawWriteCmd(), newListenCmd(), newCCCDCmd(),
-		newMTUCmd(), newShellCmd(), newBatchCmd(), newServeCmd(), newSendCmd(),
+		newMTUCmd(), newPairCmd(), newUnpairCmd(), newConnParamsCmd(),
+		newDisconnectCmd(), newForgetCmd(),
+		newShellCmd(), newBatchCmd(), newServeCmd(), newSendCmd(),
 	)
 	add("assess",
-		newReconCmd(), newAssessCmd(), newPairCmd(), newUnpairCmd(), newConnParamsCmd(),
+		newReconCmd(), newAssessCmd(),
 	)
 	add("fuzz", newFuzzCmd())
 	add("diag",
-		newDoctorCmd(), newAdapterCmd(), newDisconnectCmd(), newForgetCmd(),
-		newBdaddrCmd(), newMonitorCmd(),
+		newDoctorCmd(), newAdapterCmd(), newBdaddrCmd(), newMonitorCmd(),
 	)
 	cmd.AddCommand(newCompletionCmd()) // ungrouped (Additional Commands)
 	return cmd

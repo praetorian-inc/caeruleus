@@ -50,10 +50,10 @@ make test         # unit tests + shell tests
 
 | Group | Commands |
 |---|---|
-| Discovery / interaction | `scan`, `enumerate`, `primary`, `characteristics`, `read`, `write`, `raw-write`, `listen`, `cccd`, `mtu`, `shell`, `batch`, `serve`/`send` |
-| Security assessment | `recon`, `assess check-auth`, `assess encryption`, `assess dfu`, `assess wwr`, `pair`/`unpair`, `conn-params` |
+| Discovery / interaction | `scan`, `enumerate`, `primary`, `characteristics`, `read`, `write`, `raw-write`, `listen`, `cccd`, `mtu`, `pair`/`unpair`, `conn-params`, `disconnect`, `forget`, `shell`, `batch`, `serve`/`send` |
+| Security assessment | `recon`, `assess check-auth`, `assess encryption`, `assess dfu`, `assess wwr` |
 | Fuzzing | `fuzz write` (incl. `--raw`), `fuzz replay` |
-| Adapter / diagnostics | `doctor`, `adapter`, `disconnect`, `forget`, `bdaddr`, `monitor` |
+| Adapter / diagnostics | `doctor`, `adapter`, `bdaddr`, `monitor` |
 
 Every command takes `-b/--bdaddr`, `-i/--adapter`, `-t/--timeout`, and `-o/--format text|json|jsonl`. Assessment commands emit `{address, test, summary, findings[]}` with per-finding `severity`/`handle`/`uuid`/`evidence`. See [`skills/caeruleus/SKILL.md`](skills/caeruleus/SKILL.md) for the full reference and the recommended assessment methodology.
 
@@ -64,6 +64,7 @@ New to the tool, or coming from bettercap / gatttool / bluetoothctl / nRF Connec
 ```bash
 make build
 ./caeruleus scan -t 6
+./caeruleus enumerate -b AA:BB:CC:DD:EE:FF --values     # full GATT tree + values
 ./caeruleus recon -b AA:BB:CC:DD:EE:FF
 ./caeruleus assess check-auth -b AA:BB:CC:DD:EE:FF -o json
 sudo ./caeruleus conn-params -b AA:BB:CC:DD:EE:FF        # root: HCI monitor
