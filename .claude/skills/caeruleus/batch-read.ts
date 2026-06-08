@@ -14,10 +14,16 @@ import type { IBleClient } from './lib/types.js';
 import { BleError } from './lib/errors.js';
 import { BleMacAddressSchema, estimateTokens } from './lib/types.js';
 
+// Accept reads as plain UUID strings OR objects with a uuid field (mirrors batch-write's object style)
+const ReadEntrySchema = z.union([
+  z.string(),
+  z.object({ uuid: z.string() }),
+]);
+
 export const batchReadParams = z.object({
   mac_address: BleMacAddressSchema,
   uuids: z.array(z.string()).optional(),
-  reads: z.array(z.string()).optional(),
+  reads: z.array(ReadEntrySchema).optional(),
   gatt_map_path: z.string().optional(),
   handles: z.array(z.number()).optional(),
 });
@@ -53,7 +59,11 @@ export const batchRead = {
     const targets: Array<{ uuid?: string; handle?: number }> = [];
 
     // Accept both `uuids` and `reads` (alias for symmetry with batch-write's `writes`)
-    const allUuids = [...(validated.uuids ?? []), ...(validated.reads ?? [])];
+    // `reads` entries can be plain UUID strings or {uuid: "..."} objects
+    const normalizedReads = (validated.reads ?? []).map((entry) =>
+      typeof entry === 'string' ? entry : entry.uuid,
+    );
+    const allUuids = [...(validated.uuids ?? []), ...normalizedReads];
     for (const uuid of allUuids) {
       targets.push({ uuid });
     }

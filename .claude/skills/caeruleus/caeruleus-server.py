@@ -90,7 +90,7 @@ async def _ensure_connected(mac: Optional[str] = None) -> Any:
 
     _log(f"Connecting to {target}...")
 
-    client_kwargs: dict[str, Any] = {"timeout": 15.0}
+    client_kwargs: dict[str, Any] = {"timeout": 30.0}
     if IS_LINUX:
         client_kwargs["adapter"] = _adapter
 
@@ -244,7 +244,7 @@ async def cmd_connect(params: dict) -> dict:
     if not mac:
         raise ValueError("mac_address is required")
 
-    timeout = params.get("timeout", 15)
+    timeout = params.get("timeout", 30)
 
     from bleak import BleakClient, BleakScanner
     from bleak.exc import BleakDeviceNotFoundError
@@ -839,11 +839,19 @@ async def cmd_subscribe_raw(params: dict) -> dict:
         raise ValueError("Could not resolve value handle — provide write_handle or uuid")
     value_handle = int(value_handle)
 
-    # Disconnect Bleak so we can open a raw ATT socket (one connection at a time)
+    # Disconnect Bleak so we can open a raw ATT socket (one connection at a time).
+    # Bleak's D-Bus backend (dbus_fast) can raise EOFError if the D-Bus
+    # connection drops during disconnect — wrap to prevent aborting the command.
     if _client and _client.is_connected:
-        await _client.disconnect()
+        try:
+            await _client.disconnect()
+        except Exception as e:
+            _log(f"subscribe_raw: Bleak disconnect error (non-fatal): {e}")
     _client = None
     _gatt_cache = None
+
+    # Brief delay to let kernel fully tear down the HCI link
+    await asyncio.sleep(0.5)
 
     _log(f"subscribe_raw: opening L2CAP ATT socket to {mac}, "
          f"value_handle=0x{value_handle:04x}, duration={duration}s")
@@ -1012,11 +1020,21 @@ async def cmd_raw_att(params: dict) -> dict:
     if not operations:
         raise ValueError("operations list is required")
 
-    # Disconnect Bleak so we can open a raw ATT socket
+    # Disconnect Bleak so we can open a raw ATT socket.
+    # Bleak's D-Bus backend (dbus_fast) can raise EOFError if the D-Bus
+    # connection drops during disconnect — wrap to prevent aborting the
+    # entire command.
     if _client and _client.is_connected:
-        await _client.disconnect()
+        try:
+            await _client.disconnect()
+        except Exception as e:
+            _log(f"raw_att: Bleak disconnect error (non-fatal): {e}")
     _client = None
     _gatt_cache = None
+
+    # Brief delay to let kernel fully tear down the HCI link before
+    # opening a raw L2CAP socket to the same device.
+    await asyncio.sleep(0.5)
 
     AF_BLUETOOTH = 31
     ATT_CID = 4
@@ -1196,31 +1214,32 @@ async def cmd_raw_att(params: dict) -> dict:
     finally:
         raw.close()
 
-    # Tear down lingering BlueZ connection before Bleak reconnect (same
-    # rationale as subscribe_raw — prevents DEVICE_NOT_FOUND on next call).
-    _client = None
-    _gatt_cache = None
-    _connected_mac = mac
-    if IS_LINUX and mac:
-        try:
-            proc = await asyncio.create_subprocess_exec(
-                "bluetoothctl", "disconnect", mac,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
-            await asyncio.wait_for(proc.wait(), timeout=5)
-            _log(f"raw_att: bluetoothctl disconnect {mac} (post-raw cleanup)")
-        except Exception as e:
-            _log(f"raw_att: bluetoothctl cleanup error (non-fatal): {e}")
-        await asyncio.sleep(1)
-
-    try:
-        await _ensure_connected(mac)
-        _log("raw_att: reconnected via Bleak")
-    except Exception as e:
-        _log(f"raw_att: Bleak reconnect failed (non-fatal): {e}")
+        # Tear down lingering BlueZ connection before Bleak reconnect (same
+        # rationale as subscribe_raw — prevents DEVICE_NOT_FOUND on next call).
+        # Runs in finally so cleanup happens even if operations raise.
         _client = None
-        _connected_mac = None
+        _gatt_cache = None
+        _connected_mac = mac
+        if IS_LINUX and mac:
+            try:
+                proc = await asyncio.create_subprocess_exec(
+                    "bluetoothctl", "disconnect", mac,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+                await asyncio.wait_for(proc.wait(), timeout=5)
+                _log(f"raw_att: bluetoothctl disconnect {mac} (post-raw cleanup)")
+            except Exception as e:
+                _log(f"raw_att: bluetoothctl cleanup error (non-fatal): {e}")
+            await asyncio.sleep(1)
+
+        try:
+            await _ensure_connected(mac)
+            _log("raw_att: reconnected via Bleak")
+        except Exception as e:
+            _log(f"raw_att: Bleak reconnect failed (non-fatal): {e}")
+            _client = None
+            _connected_mac = None
 
     return {"operations": results}
 
@@ -1655,6 +1674,9 @@ SOCKET_PATH = os.environ.get("CAERULEUS_SOCKET", "/tmp/caeruleus.sock")
 
 def _classify_error(e: Exception) -> tuple[str, bool]:
     """Classify an exception into (error_code, recoverable)."""
+    # Check exception type first — TimeoutError often has an empty message
+    if isinstance(e, (TimeoutError, asyncio.TimeoutError)):
+        return "TIMEOUT", True
     err_str = str(e).lower()
     if "not connected" in err_str or "disconnect" in err_str:
         return "CONNECTION_LOST", True

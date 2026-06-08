@@ -40,6 +40,30 @@ export interface IBleClient {
 
 // --- BLE Domain Types ---
 
+/**
+ * Accepts BLE ATT handles as either a decimal number (78) or a hex string ("0x004e").
+ * GATT enumeration returns hex strings, so agents naturally pass those downstream.
+ * Coerces to a plain number for server consumption.
+ */
+export const BleHandleSchema = z
+  .union([z.number().int(), z.string()])
+  .transform((val, ctx) => {
+    if (typeof val === 'number') return val;
+    const s = val.trim();
+    const n =
+      s.startsWith('0x') || s.startsWith('0X')
+        ? parseInt(s, 16)
+        : parseInt(s, 10);
+    if (isNaN(n) || !Number.isInteger(n)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Invalid handle: ${val}`,
+      });
+      return z.NEVER;
+    }
+    return n;
+  });
+
 export const BleMacAddressSchema = z
   .string()
   .regex(
@@ -62,7 +86,7 @@ export const BleConnectParamsSchema = z.object({
   mac_address: BleMacAddressSchema,
   mac_type: BleMacTypeSchema.default('public'),
   adapter: z.string().default('hci0'),
-  timeout: z.number().min(1).max(60).default(15),
+  timeout: z.number().min(1).max(60).default(30),
 });
 export type BleConnectParams = z.infer<typeof BleConnectParamsSchema>;
 

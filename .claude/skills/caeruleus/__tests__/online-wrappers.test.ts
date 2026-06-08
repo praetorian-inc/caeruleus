@@ -9,6 +9,7 @@ import { testWwrAbuse } from '../test-wwr-abuse.js';
 import { readCharacteristic } from '../read-characteristic.js';
 import { writeCharacteristic } from '../write-characteristic.js';
 import { testDfu } from '../test-dfu.js';
+import { batchRead } from '../batch-read.js';
 
 // ---------------------------------------------------------------------------
 // Mock BLE client factory
@@ -30,6 +31,77 @@ function createMockClient(
     shutdown: vi.fn(async () => {}),
   };
 }
+
+// ---------------------------------------------------------------------------
+// batch-read
+// ---------------------------------------------------------------------------
+describe('batchRead', () => {
+  it('accepts reads as plain UUID strings', async () => {
+    const client = createMockClient({
+      connect: { connected: true },
+      read_characteristic: {
+        raw_hex: '48656c6c6f',
+        decoded: 'Hello',
+        length: 5,
+      },
+    });
+
+    const result = await batchRead.execute(
+      {
+        mac_address: 'AA:BB:CC:DD:EE:FF',
+        reads: ['2a00', '2a01'],
+      },
+      client,
+    );
+
+    expect(result.successful).toBe(2);
+    expect(result.failed).toBe(0);
+  });
+
+  it('accepts reads as objects with uuid field', async () => {
+    const client = createMockClient({
+      connect: { connected: true },
+      read_characteristic: {
+        raw_hex: '48656c6c6f',
+        decoded: 'Hello',
+        length: 5,
+      },
+    });
+
+    const result = await batchRead.execute(
+      {
+        mac_address: 'AA:BB:CC:DD:EE:FF',
+        reads: [{ uuid: '2a00' }, { uuid: '2a01' }],
+      },
+      client,
+    );
+
+    expect(result.successful).toBe(2);
+    expect(result.failed).toBe(0);
+  });
+
+  it('accepts mixed string and object reads', async () => {
+    const client = createMockClient({
+      connect: { connected: true },
+      read_characteristic: {
+        raw_hex: '48656c6c6f',
+        decoded: 'Hello',
+        length: 5,
+      },
+    });
+
+    const result = await batchRead.execute(
+      {
+        mac_address: 'AA:BB:CC:DD:EE:FF',
+        reads: ['2a00', { uuid: '2a01' }],
+      },
+      client,
+    );
+
+    expect(result.successful).toBe(2);
+    expect(result.failed).toBe(0);
+  });
+});
 
 // ---------------------------------------------------------------------------
 // scan-devices

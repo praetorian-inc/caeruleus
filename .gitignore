@@ -2,7 +2,12 @@
 .DS_Store
 
 # Claude Code
-.claude/
+.claude/*
+!.claude/skills/
+# Editor/tooling artifacts (can appear nested under skills)
+.history/
+.local/
+.output/
 
 # Node
 node_modules/

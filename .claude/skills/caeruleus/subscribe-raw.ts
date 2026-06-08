@@ -11,12 +11,12 @@ import { fileURLToPath } from 'node:url';
 import { callBle } from './lib/client.js';
 import type { IBleClient } from './lib/types.js';
 import { BleError } from './lib/errors.js';
-import { BleMacAddressSchema, estimateTokens } from './lib/types.js';
+import { BleHandleSchema, BleMacAddressSchema, estimateTokens } from './lib/types.js';
 
 export const subscribeRawParams = z.object({
   mac_address: BleMacAddressSchema,
   uuid: z.string().optional(),
-  handle: z.number().optional(),
+  handle: BleHandleSchema.optional(),
   duration: z.number().min(1).max(3600).default(10),
   write_value_hex: z.string().optional(),
   enable_notifications: z.boolean().optional(),

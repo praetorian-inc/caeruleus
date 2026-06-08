@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 import { callBle } from './lib/client.js';
 import type { IBleClient } from './lib/types.js';
 import { BleError } from './lib/errors.js';
-import { BleMacAddressSchema, estimateTokens } from './lib/types.js';
+import { BleHandleSchema, BleMacAddressSchema, estimateTokens } from './lib/types.js';
 
 const AttOperationSchema = z.discriminatedUnion('type', [
   z.object({
@@ -21,11 +21,11 @@ const AttOperationSchema = z.discriminatedUnion('type', [
   }),
   z.object({
     type: z.literal('read'),
-    handle: z.number().min(1),
+    handle: BleHandleSchema.pipe(z.number().min(1)),
   }),
   z.object({
     type: z.literal('write'),
-    handle: z.number().min(1),
+    handle: BleHandleSchema.pipe(z.number().min(1)),
     value_hex: z.string().regex(/^[0-9a-fA-F]*$/, 'Value must be hex string'),
   }),
   z.object({

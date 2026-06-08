@@ -16,7 +16,7 @@ export const enumerateGattParams = z.object({
   mac_address: BleMacAddressSchema,
   mac_type: z.enum(['public', 'random']).default('public'),
   adapter: z.string().default('hci0'),
-  timeout: z.number().min(1).max(60).default(15),
+  timeout: z.number().min(1).max(60).default(30),
   force_refresh: z.boolean().default(false),
 });
 export type EnumerateGattInput = z.infer<typeof enumerateGattParams>;
@@ -38,13 +38,25 @@ export const enumerateGatt = {
           client.call({ command: cmd, params })
       : callBle;
 
-    // Connect first
-    await callFn('connect', {
+    // Connect with auto-retry on timeout (first connection includes BLE
+    // service resolution which can exceed the timeout on uncached devices)
+    const connectParams = {
       mac_address: validated.mac_address,
       mac_type: validated.mac_type,
       adapter: validated.adapter,
       timeout: validated.timeout,
-    });
+    };
+    try {
+      await callFn('connect', connectParams);
+    } catch (err) {
+      const bleErr = err as BleError;
+      if (bleErr.code === 'TIMEOUT' || bleErr.code === 'UNKNOWN') {
+        console.error('[enumerate-gatt] First connect timed out, retrying...');
+        await callFn('connect', connectParams);
+      } else {
+        throw err;
+      }
+    }
 
     // Get GATT map
     const raw = (await callFn('get_gatt_map', {

@@ -67,6 +67,7 @@ ESP32-Gattacker      - MITM relay via WebSocket (ws://1.3.3.7/ws)
 ```
 
 - **First call**: ~2-4 seconds (BLE adapter init)
+- **First `enumerate-gatt`**: ~10-30 seconds (BLE connection + full GATT service discovery). Use a Bash timeout of at least 90000ms. The wrapper auto-retries once on timeout.
 - **Subsequent calls**: ~50-200ms (connection reuse)
 
 ## Available Tools
@@ -87,7 +88,7 @@ ESP32-Gattacker      - MITM relay via WebSocket (ws://1.3.3.7/ws)
 | --- | --- | --- |
 | `test-pairing` | Test pairing enforcement | `mac_address`, `test_enforcement`, `test_legacy_fallback` |
 | `test-encryption` | Test encryption requirements | `mac_address` |
-| `subscribe-notifications` | Monitor notifications/indications | `uuid`, `duration` |
+| `subscribe-notifications` | Monitor notifications/indications | `mac_address`, `uuid`, `duration` |
 | `audit-gatt-profile` | Audit GATT against BLE spec (offline) | `gatt_map_path` |
 | `sniff-decode` | Capture & decode BLE packets | `target_mac`, `duration`, `mode` |
 | `analyze-connection-params` | Analyze connection parameters | `mac_address` |
@@ -96,10 +97,10 @@ ESP32-Gattacker      - MITM relay via WebSocket (ws://1.3.3.7/ws)
 
 | Wrapper | Purpose | Key Parameters |
 | --- | --- | --- |
-| `fuzz-characteristic` | Fuzz writable characteristics | `uuid`, `strategy`, `iterations` |
-| `test-wwr-abuse` | Test write-without-response abuse | `uuids`, `rapid_fire_count`, `max_write_sizes` |
+| `fuzz-characteristic` | Fuzz writable characteristics | `mac_address`, `uuid`, `strategy`, `iterations` |
+| `test-wwr-abuse` | Test write-without-response abuse | `mac_address`, `uuids`, `rapid_fire_count`, `max_write_sizes` |
 | `test-auth-bypass` | Test authentication bypass | `mac_address` |
-| `replay-writes` | Replay captured write operations | `writes`, `unpair_before_replay` |
+| `replay-writes` | Replay captured write operations | `mac_address`, `writes`, `unpair_before_replay` |
 | `test-dfu` | Test Nordic DFU security | `mac_address`, `test_unsigned`, `test_buttonless` |
 | `mitm-relay` | MITM relay via ESP32-Gattacker | `target_mac`, `enable_hooks`, `capture_duration_seconds` |
 | `spoof-notifications` | Spoof notification values via MITM | `target_mac`, `spoofed_values` |
@@ -138,42 +139,48 @@ ESP32-Gattacker      - MITM relay via WebSocket (ws://1.3.3.7/ws)
 
 ## Usage
 
+**All wrapper paths are relative to this skill's base directory.** Set `SKILL_DIR` before running any wrapper:
+
+```bash
+SKILL_DIR=".claude/skills/caeruleus"
+```
+
 ### Scan for BLE Devices
 
 ```bash
-npx tsx scan-devices.ts '{"duration": 15}'
-npx tsx scan-devices.ts '{"duration": 10, "target_mac": "AA:BB:CC:DD:EE:FF"}'
+npx tsx "$SKILL_DIR/scan-devices.ts" '{"duration": 15}'
+npx tsx "$SKILL_DIR/scan-devices.ts" '{"duration": 10, "target_mac": "AA:BB:CC:DD:EE:FF"}'
 ```
 
 ### Enumerate GATT Services
 
 ```bash
-npx tsx enumerate-gatt.ts '{"mac_address": "AA:BB:CC:DD:EE:FF"}'
+npx tsx "$SKILL_DIR/enumerate-gatt.ts" '{"mac_address": "AA:BB:CC:DD:EE:FF"}'
 ```
 
 ### Fuzz a Characteristic
 
 ```bash
-npx tsx fuzz-characteristic.ts '{"uuid": "2a00", "strategy": "boundary", "iterations": 500}'
+npx tsx "$SKILL_DIR/fuzz-characteristic.ts" '{"mac_address": "AA:BB:CC:DD:EE:FF", "uuid": "2a00", "strategy": "boundary", "iterations": 500}'
 ```
 
 ### Test Pairing Security
 
 ```bash
-npx tsx test-pairing.ts '{"mac_address": "AA:BB:CC:DD:EE:FF"}'
+npx tsx "$SKILL_DIR/test-pairing.ts" '{"mac_address": "AA:BB:CC:DD:EE:FF"}'
 ```
 
 ### MITM Relay via ESP32-Gattacker
 
 Requires ESP32-Gattacker hardware on WiFi (default: ws://1.3.3.7/ws).
 ```bash
-npx tsx mitm-relay.ts '{"target_mac": "AA:BB:CC:DD:EE:FF", "enable_hooks": true, "capture_duration_seconds": 120}'
+npx tsx "$SKILL_DIR/mitm-relay.ts" '{"target_mac": "AA:BB:CC:DD:EE:FF", "enable_hooks": true, "capture_duration_seconds": 120}'
 ```
 
 ### Test Nordic DFU Security
 
 ```bash
-npx tsx test-dfu.ts '{"mac_address": "AA:BB:CC:DD:EE:FF"}'
+npx tsx "$SKILL_DIR/test-dfu.ts" '{"mac_address": "AA:BB:CC:DD:EE:FF"}'
 ```
 
 **Important:** If the user asks to "test a BLE device" without specifying a target, first run `scan-devices` to show nearby devices and ask the user which MAC to target. Do not guess.
@@ -251,6 +258,14 @@ bluetoothctl disconnect <MAC>
 ```
 
 **Root cause:** Killing the Node.js wrapper does not stop the detached Python server, and if Bleak is stuck (e.g. mid-`start_notify` on a CCCD-less device), `_cleanup_ble` previously hung on `_client.disconnect()` and never reached the `bluetoothctl` fallback. The server now applies a 5-second timeout to the Bleak disconnect to ensure the fallback always runs. **Always use `shutdown-server` instead of `pkill` to stop the server.**
+
+### TimeoutError on First Connection
+
+```
+Error: TIMEOUT - TimeoutError()
+```
+
+The `enumerate-gatt` wrapper auto-retries once on timeout, so this should be transparent. If it still fails after the automatic retry, check that the device is powered on and in range with `scan-devices`.
 
 ### Connection Lost
 
