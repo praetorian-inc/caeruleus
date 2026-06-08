@@ -57,6 +57,8 @@ make test         # unit tests + shell tests
 
 Every command takes `-b/--bdaddr`, `-i/--adapter`, `-t/--timeout`, and `-o/--format text|json|jsonl`. Assessment commands emit `{address, test, summary, findings[]}` with per-finding `severity`/`handle`/`uuid`/`evidence`. See [`skills/caeruleus/SKILL.md`](skills/caeruleus/SKILL.md) for the full reference and the recommended assessment methodology.
 
+New to the tool, or coming from bettercap / gatttool / bluetoothctl / nRF Connect / custom Bleak scripts? The [quick reference](docs/quick-reference.md) maps those habits to caeruleus commands.
+
 ### Quick start
 
 ```bash
