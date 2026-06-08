@@ -37,7 +37,7 @@ the supported way to bring the LE stack down and back up cleanly, and the
 right recovery when the controller is stuck in INQUIRY mode or otherwise
 not receiving LE advertisements. caeruleus's own operations (notably
 bdaddr --set) now use this rather than the legacy HCIDEVRESET ioctl, so
-the stuck state shouldn't arise from our own paths — but external tools
+the stuck state shouldn't arise from our own paths - but external tools
 or kernel resets can still wedge it, hence this manual rescue.
 
 cycle = off → wait briefly → on; useful as a one-shot rescue.
@@ -101,13 +101,13 @@ func setPower(on bool) error {
 }
 
 // cyclePower performs an off→on toggle. Used by `adapter power cycle` and
-// implicitly by `bdaddr --set` to apply the vendor write — replacing the
+// implicitly by `bdaddr --set` to apply the vendor write - replacing the
 // HCIDEVRESET ioctl which reliably wedged Intel adapters in INQUIRY mode.
 func cyclePower() error {
 	if err := setPower(false); err != nil {
 		return err
 	}
-	// Brief settle window — the controller drops to its idle state and
+	// Brief settle window - the controller drops to its idle state and
 	// the kernel deallocates scan parameters here. Coming back up before
 	// this is finished can lead to the very stuck-INQUIRY state we're
 	// trying to escape.

@@ -17,7 +17,7 @@ import (
 )
 
 // l2capHarness drives writes through a raw L2CAP/ATT socket and runs
-// alone — no parallel BlueZ session. The earlier "BlueZ for liveness +
+// alone - no parallel BlueZ session. The earlier "BlueZ for liveness +
 // L2CAP for writes" design fell over on the most interesting bug class:
 // targets whose chars BlueZ claims for itself, where the kernel refuses
 // a second L2CAP socket on CID 0x0004. We now disconnect BlueZ at start
@@ -25,7 +25,7 @@ import (
 // socket.
 //
 // Liveness is a Read Request to a known-good handle (default 0x0001,
-// the GATT primary service declaration — universally present on
+// the GATT primary service declaration - universally present on
 // standards-compliant BLE servers). Override with --liveness-handle.
 type l2capHarness struct {
 	addr           string
@@ -63,7 +63,7 @@ func newL2CAPHarness(addr string, target, liveness uint16, resetCmd string, noLi
 }
 
 // connect detaches BlueZ from the peer if needed, then opens a fresh
-// raw L2CAP socket. We do NOT keep a parallel BlueZ session — see the
+// raw L2CAP socket. We do NOT keep a parallel BlueZ session - see the
 // package comment for why.
 func (h *l2capHarness) connect() error {
 	leAddr, err := bdaddrPkg.ParseMAC(h.addr)
@@ -76,10 +76,10 @@ func (h *l2capHarness) connect() error {
 	}
 
 	// Try opening L2CAP directly first; if the kernel says EBUSY, BlueZ
-	// is holding the link — detach via Device1.Disconnect() and retry.
+	// is holding the link - detach via Device1.Disconnect() and retry.
 	conn, err := l2cap.Dial(peer, h.addrType)
 	if err != nil && isResourceBusy(err) {
-		logf("L2CAP EBUSY — disconnecting BlueZ from %s and retrying", h.addr)
+		logf("L2CAP EBUSY - disconnecting BlueZ from %s and retrying", h.addr)
 		if derr := detachBlueZ(h.addr); derr != nil {
 			return fmt.Errorf("detach BlueZ: %w (original dial error: %v)", derr, err)
 		}
@@ -94,8 +94,7 @@ func (h *l2capHarness) connect() error {
 	return nil
 }
 
-// detachBlueZ asks bluetoothd to drop the LE link to addr. Idempotent —
-// if BlueZ doesn't know the device or it's already disconnected, this
+// detachBlueZ asks bluetoothd to drop the LE link to addr. Idempotent - // if BlueZ doesn't know the device or it's already disconnected, this
 // returns nil.
 func detachBlueZ(addr string) error {
 	// Minimal D-Bus dance. We can't reuse openSession because that
@@ -112,7 +111,7 @@ func detachBlueZ(addr string) error {
 		return nil
 	}
 	if err := dev.Disconnect(); err != nil {
-		// "unknown device" / "no such object" — BlueZ never saw it; fine.
+		// "unknown device" / "no such object" - BlueZ never saw it; fine.
 		if strings.Contains(strings.ToLower(err.Error()), "no such") ||
 			strings.Contains(strings.ToLower(err.Error()), "unknown") {
 			return nil
@@ -152,7 +151,7 @@ func (h *l2capHarness) Write(ctx context.Context, op engine.Op, value []byte) en
 				Err:  err,
 			}
 		}
-		// No response from the peer for Write Command — opcode 0 in the
+		// No response from the peer for Write Command - opcode 0 in the
 		// oracle tuple signals "we sent and got nothing back".
 		return engine.WriteResult{Resp: oracle.Response{}}
 
@@ -196,21 +195,21 @@ func (h *l2capHarness) Liveness(ctx context.Context) error {
 		return nil
 	case l2cap.OpErrorResponse:
 		// Read failures on a normally-readable handle are legitimately
-		// a liveness signal too — but not if it's "Read Not Permitted"
+		// a liveness signal too - but not if it's "Read Not Permitted"
 		// on a write-only handle the user chose. Treat any non-disconnect
 		// error response as alive-but-grumpy: live=true, we want to keep
 		// fuzzing.
 		return nil
 	default:
 		// Unexpected opcode (e.g., the 0x02 garbage we observed from a
-		// crashing target). Treat as liveness failure — the link is
+		// crashing target). Treat as liveness failure - the link is
 		// returning corrupt PDUs.
 		return fmt.Errorf("liveness Read got unexpected opcode 0x%02x", r.Opcode)
 	}
 }
 
 func (h *l2capHarness) Reset(ctx context.Context) error {
-	// resetCmd is optional in L2CAP mode — if absent we just close the
+	// resetCmd is optional in L2CAP mode - if absent we just close the
 	// socket, wait a bit (target reboot window), and reopen. The reset
 	// hook adds an explicit shell step on top of that.
 	if h.conn != nil {
@@ -226,7 +225,7 @@ func (h *l2capHarness) Reset(ctx context.Context) error {
 			return fmt.Errorf("reset command exited: %w", err)
 		}
 	} else {
-		// Default settle window — long enough for an nRF52 / similar
+		// Default settle window - long enough for an nRF52 / similar
 		// MCU to crash, watchdog-reset, re-advertise.
 		time.Sleep(8 * time.Second)
 	}
@@ -247,13 +246,13 @@ func (h *l2capHarness) Close() error {
 
 // wrapATTResp converts an l2cap.Response (+ transport err) into the
 // engine's WriteResult. The whole point of the L2CAP path: an ATT Error
-// Response is signal, not failure — err is reserved for socket-dead
+// Response is signal, not failure - err is reserved for socket-dead
 // scenarios.
 //
 // expectedOK is the opcode the peer is supposed to return on success
 // for the request we sent (e.g. 0x13 for Write Request). The peer may
-// also legally return Error Response (0x01). Anything else — like the
-// 0x02 garbage we've seen from crashing firmware — is treated as
+// also legally return Error Response (0x01). Anything else - like the
+// 0x02 garbage we've seen from crashing firmware - is treated as
 // disconnect so the engine attributes the crash to *this* input, not
 // the next one that finally trips the socket-dead error.
 func wrapATTResp(r l2cap.Response, err error, expectedOK uint8) engine.WriteResult {
@@ -270,8 +269,8 @@ func wrapATTResp(r l2cap.Response, err error, expectedOK uint8) engine.WriteResu
 	}
 	// Validate the opcode is one we'd expect. Error Response (0x01) is
 	// always legal; the request-specific success opcode is too. Anything
-	// else — including the empirically-observed 0x02 from buffer-overflow
-	// firmware — is treated as a crash indicator on *this* iteration.
+	// else - including the empirically-observed 0x02 from buffer-overflow
+	// firmware - is treated as a crash indicator on *this* iteration.
 	if r.Opcode != expectedOK && r.Opcode != l2cap.OpErrorResponse {
 		resp.Disconnected = true
 	}

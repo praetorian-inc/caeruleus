@@ -1,15 +1,15 @@
 /**
- * sensor_sim_svc.h — Sensor Simulation Service (UUID 0x5E45)
+ * sensor_sim_svc.h - Sensor Simulation Service (UUID 0x5E45)
  *
  * Deliberately vulnerable BLE service for Caeruleus security testing.
  * Simulates temperature, humidity, and battery level sensors with
  * periodic notifications. All characteristics use open permissions
- * with no encryption — MITM can intercept and spoof sensor data.
+ * with no encryption - MITM can intercept and spoof sensor data.
  *
  * Characteristics:
- *   Temperature (0x0001) — Read + Notify, int16_t  (0.01 C units)
- *   Humidity    (0x0002) — Read + Notify, uint16_t (0.01% units)
- *   Battery     (0x0003) — Read + Notify, uint8_t  (0-100%)
+ *   Temperature (0x0001) - Read + Notify, int16_t  (0.01 C units)
+ *   Humidity    (0x0002) - Read + Notify, uint16_t (0.01% units)
+ *   Battery     (0x0003) - Read + Notify, uint8_t  (0-100%)
  */
 
 #ifndef SENSOR_SIM_SVC_H__

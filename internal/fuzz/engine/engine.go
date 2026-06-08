@@ -1,7 +1,7 @@
 // Package engine is the fuzzing main loop: pick a parent input, mutate
 // it, hand it to the transport-specific Harness, classify the response,
 // log, and decide on corpus admission. The engine is transport-agnostic
-// — Phase 1a wires a BlueZ-D-Bus Harness, Phase 1b a raw-L2CAP Harness.
+// - Phase 1a wires a BlueZ-D-Bus Harness, Phase 1b a raw-L2CAP Harness.
 package engine
 
 import (
@@ -22,10 +22,10 @@ import (
 type Op uint8
 
 const (
-	OpWriteReq   Op = iota // 0x12 — Write Request, has Write Response
-	OpWriteCmd             // 0x52 — Write Command, no response
-	OpPrepWrite            // 0x16 — Prepare Write Request, multi-PDU prefix
-	OpExecWrite            // 0x18 — Execute Write Request, finalizer
+	OpWriteReq   Op = iota // 0x12 - Write Request, has Write Response
+	OpWriteCmd             // 0x52 - Write Command, no response
+	OpPrepWrite            // 0x16 - Prepare Write Request, multi-PDU prefix
+	OpExecWrite            // 0x18 - Execute Write Request, finalizer
 )
 
 // String returns the short opcode name used in trace records.
@@ -276,6 +276,6 @@ func fillRespFields(rec *trace.Record, r oracle.Response) {
 	}
 }
 
-// ErrNoOps is returned if Config.Ops would be empty after Defaults — a
+// ErrNoOps is returned if Config.Ops would be empty after Defaults - a
 // guard for misconfigured callers.
 var ErrNoOps = errors.New("engine: no Ops configured")

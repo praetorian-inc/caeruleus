@@ -92,7 +92,7 @@ Examples:
       --max-iter 1000000 \
       --target-reset "ssh root@plug ./toggle.sh && sleep 8"
 
-  # prep + exec via raw L2CAP — fuzz the prepared-write queue
+  # prep + exec via raw L2CAP - fuzz the prepared-write queue
   sudo caeruleus -b AA:BB:CC:DD:EE:FF fuzz write -a 0x002c \
       --type both --include prep,exec --max-iter 5000`,
 		RunE: runFuzzWrite,
@@ -160,7 +160,7 @@ func runFuzzWrite(cmd *cobra.Command, args []string) error {
 
 	// Connect once to enumerate the tree, pin the target handle, auto-read
 	// the seed, and pick a liveness handle. In --raw mode we close this
-	// session afterward — the L2CAP harness runs solo and disconnects
+	// session afterward - the L2CAP harness runs solo and disconnects
 	// BlueZ explicitly if the kernel won't allow a second socket.
 	statusf("opening session to %s", addr)
 	openCtx, openCancel := ctxWithRootTimeout()
@@ -217,7 +217,7 @@ func runFuzzWrite(cmd *cobra.Command, args []string) error {
 	}
 	defer tr.Close()
 
-	// Build harness. We always keep the BlueZ session open — even in
+	// Build harness. We always keep the BlueZ session open - even in
 	// --raw mode it carries the liveness probe + GATT enumeration.
 	var h engine.Harness
 	switch {
@@ -250,7 +250,7 @@ func runFuzzWrite(cmd *cobra.Command, args []string) error {
 	//   - BlueZ Layer A: kernel enforces value ≤ MTU-3 anyway, so we cap
 	//     locally to keep the mutator productive (inputs BlueZ would
 	//     reject are wasted iterations).
-	//   - Raw L2CAP: the whole point is to *exceed* MTU-3 — that's where
+	//   - Raw L2CAP: the whole point is to *exceed* MTU-3 - that's where
 	//     single-PDU buffer-overflow bugs live. Default to a generous
 	//     cap (512) unless the user explicitly tuned --max-value-len.
 	maxLen := fuzzWriteFlags.maxValueLen
@@ -385,7 +385,7 @@ func parseFuzzTypes(s string) ([]engine.Op, error) {
 // lengths just above MTU-3 (the spec's max single-PDU write payload).
 // These seeds put the mutator at the interesting threshold from iter 0.
 //
-// Pattern byte is 0x41 ('A') — easy to spot in pcaps and unlikely to
+// Pattern byte is 0x41 ('A') - easy to spot in pcaps and unlikely to
 // collide with structural framing in the target's parser.
 func boundarySeeds() [][]byte {
 	lengths := []int{244, 245, 246, 247, 248, 252, 253, 254, 255, 256, 511, 512}
@@ -435,7 +435,7 @@ func opsToStrings(ops []engine.Op) []string {
 // loadSeeds assembles the initial parent pool: --seed-file or --seed-dir
 // or --seed take precedence over auto-read.  --no-seed forces an empty
 // initial pool.  In the auto path, we read the current value of the
-// target characteristic — that's the "natural" payload the device
+// target characteristic - that's the "natural" payload the device
 // understands, and the cheapest path to interesting mutations.
 func loadSeeds(s *session, target bluez.GattObject) ([][]byte, error) {
 	var seeds [][]byte
@@ -518,7 +518,7 @@ func pickLivenessHandle(s *session, targetHandle uint16, explicit string) (uint1
 
 // ---------------------- BlueZ harness ----------------------
 
-// bluezHarness drives writes through the BlueZ D-Bus API (Layer A) — same
+// bluezHarness drives writes through the BlueZ D-Bus API (Layer A) - same
 // path as the `write` subcommand. Sufficient for write-with-response and
 // write-without-response. Multi-PDU Prepare/Execute writes need raw
 // L2CAP and ship in Phase 1b.
@@ -559,7 +559,7 @@ func (h *bluezHarness) Write(ctx context.Context, op engine.Op, value []byte) en
 	switch {
 	case werr == nil:
 		// Successful write. For req, BlueZ confirms Write Response (0x13).
-		// For cmd, BlueZ accepts and returns immediately — no PDU back.
+		// For cmd, BlueZ accepts and returns immediately - no PDU back.
 		if op == engine.OpWriteReq {
 			resp.Opcode = 0x13
 		}
@@ -634,13 +634,13 @@ func (h *bluezHarness) Close() error {
 // classifyBluezError extracts a synthetic ATT error code from a BlueZ
 // dbus error message. The BlueZ-to-ATT mapping is loose; we recognise
 // the common patterns and fall back to 0xFF for "unknown error". The
-// goal isn't perfect fidelity — it's enough discrimination that the
+// goal isn't perfect fidelity - it's enough discrimination that the
 // oracle's state hash treats different error families as different
 // states.
 //
 // 0xFE is reserved for "looks like a transient transport error" so it
 // doesn't collide with real ATT codes (which are 0x01..0x11 plus
-// application-specific 0x80..0xFF — but BlueZ never surfaces those raw).
+// application-specific 0x80..0xFF - but BlueZ never surfaces those raw).
 var attErrCodeRe = regexp.MustCompile(`0x([0-9a-fA-F]{2})`)
 
 func classifyBluezError(msg string) uint8 {

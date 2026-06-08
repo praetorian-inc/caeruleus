@@ -73,7 +73,7 @@ attempt exits 0 with the rejection recorded in 'pair_error' (text) or the
 "error" field (JSON). A failure to reach the device at all is a hard error.
 
 Use this to test whether a peripheral enforces pairing before exposing
-characteristics — pair, then re-read the same characteristic that errored
+characteristics - pair, then re-read the same characteristic that errored
 unpaired (see 'caeruleus encryption' for the automated form).`,
 		RunE: runPair,
 	}
@@ -84,7 +84,7 @@ func newUnpairCmd() *cobra.Command {
 		Use:   "unpair",
 		Short: "Drop the bond / pairing for -b BDADDR (BlueZ Adapter1.RemoveDevice)",
 		Long: `Cancels any in-progress pairing and removes the stored bond by purging the
-Device1 object (Adapter1.RemoveDevice) — the only lever BlueZ gives us to
+Device1 object (Adapter1.RemoveDevice) - the only lever BlueZ gives us to
 drop long-term keys. The next connect re-discovers and re-pairs from scratch.
 
 This is the same underlying call as 'forget'; 'unpair' exists as the
@@ -104,7 +104,7 @@ func runPair(cmd *cobra.Command, args []string) error {
 
 	pa, err := attemptPair(ctx, addr)
 	if err != nil {
-		return err // could not reach the device — a real error
+		return err // could not reach the device - a real error
 	}
 
 	res := pairResult{Address: addr, Action: "pair", Paired: pa.paired, Bonded: pa.bonded}
@@ -151,7 +151,7 @@ func runUnpair(cmd *cobra.Command, args []string) error {
 	case rmErr == nil:
 		res.Removed = true
 	case containsAny(rmErr.Error(), "Does Not Exist", "No such device", "UnknownObject"):
-		// Already gone — bond is absent, which is the desired post-state.
+		// Already gone - bond is absent, which is the desired post-state.
 		res.Removed = true
 	default:
 		return fmt.Errorf("RemoveDevice: %w", rmErr)

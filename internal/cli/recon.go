@@ -132,7 +132,7 @@ func runRecon(cmd *cobra.Command, args []string) error {
 		res.Findings = append(res.Findings, Finding{
 			Title:    "DFU service present",
 			Severity: SevMedium,
-			Detail:   "A device firmware update service (0xFE59) is exposed — firmware-update attack surface. Run 'caeruleus assess dfu' to test whether entry is authenticated.",
+			Detail:   "A device firmware update service (0xFE59) is exposed - firmware-update attack surface. Run 'caeruleus assess dfu' to test whether entry is authenticated.",
 		})
 	}
 	if p.Serial != "" {
@@ -198,7 +198,7 @@ func (s *session) readPPCP() string {
 
 func printReconText(res reconResult) {
 	p := res.Profile
-	fmt.Printf("# recon — %s\n", res.Address)
+	fmt.Printf("# recon - %s\n", res.Address)
 	line := func(k, v string) {
 		if v != "" {
 			fmt.Printf("  %-14s %s\n", k+":", v)

@@ -1,12 +1,12 @@
 /**
- * cmd_ctrl_svc.c — Command & Control Service (0xC0DE)
+ * cmd_ctrl_svc.c - Command & Control Service (0xC0DE)
  *
  * Deliberately vulnerable BLE service for security testing.
  *
  * Vulnerabilities exposed:
- *   1. Command Input   — no sequence number, no nonce → replay attacks
- *   2. Command Response — memcpy without bounds check → buffer overflow / HardFault
- *   3. Admin Control    — open permissions → auth bypass after unpairing
+ *   1. Command Input - no sequence number, no nonce → replay attacks
+ *   2. Command Response - memcpy without bounds check → buffer overflow / HardFault
+ *   3. Admin Control - open permissions → auth bypass after unpairing
  *
  * nRF5 SDK 17.1.0 + SoftDevice S140 v7.2.0
  */
@@ -18,7 +18,7 @@
 #include "ble_srv_common.h"
 
 /* --------------------------------------------------------------------------
- * Static buffers — deliberately fixed-size for overflow testing
+ * Static buffers - deliberately fixed-size for overflow testing
  * -------------------------------------------------------------------------- */
 
 /** Command Input: stores last received command, no replay protection. */
@@ -26,13 +26,13 @@ static uint8_t m_cmd_input_buf[CMD_INPUT_MAX_LEN];
 static uint16_t m_cmd_input_len;
 
 /**
- * Command Response buffer — VULNERABILITY:
+ * Command Response buffer - VULNERABILITY:
  * Fixed at 244 bytes.  Writes exceeding this length are memcpy'd without
  * bounds checking, causing a stack/static buffer overflow → HardFault.
  */
 static uint8_t m_cmd_response_buf[CMD_RESPONSE_BUF_LEN];
 
-/** Admin state byte — accessible regardless of pairing state. */
+/** Admin state byte - accessible regardless of pairing state. */
 static uint8_t m_admin_state;
 
 /** Tracks whether Command Response notifications are enabled via CCCD. */
@@ -46,7 +46,7 @@ static bool m_cmd_resp_notif_enabled;
  * @brief Add the Command Input characteristic (UUID 0x0001).
  *
  * Write-only, open permissions, no authentication.
- * Deliberately lacks sequence numbers / nonces — replay-vulnerable.
+ * Deliberately lacks sequence numbers / nonces - replay-vulnerable.
  */
 static uint32_t cmd_input_char_add(ble_cmd_ctrl_svc_t * p_svc)
 {
@@ -68,7 +68,7 @@ static uint32_t cmd_input_char_add(ble_cmd_ctrl_svc_t * p_svc)
     ble_uuid.uuid = BLE_CMD_INPUT_CHAR_UUID;
 
     memset(&attr_md, 0, sizeof(attr_md));
-    /* Open permissions — no encryption, no authentication required */
+    /* Open permissions - no encryption, no authentication required */
     BLE_GAP_CONN_SEC_MODE_SET_OPEN(&attr_md.read_perm);
     BLE_GAP_CONN_SEC_MODE_SET_OPEN(&attr_md.write_perm);
     attr_md.vloc = BLE_GATTS_VLOC_STACK;
@@ -105,7 +105,7 @@ static uint32_t cmd_response_char_add(ble_cmd_ctrl_svc_t * p_svc)
     ble_gatts_attr_md_t attr_md;
     ble_gatts_attr_md_t cccd_md;
 
-    /* CCCD metadata — open permissions so any peer can enable notifications */
+    /* CCCD metadata - open permissions so any peer can enable notifications */
     memset(&cccd_md, 0, sizeof(cccd_md));
     BLE_GAP_CONN_SEC_MODE_SET_OPEN(&cccd_md.read_perm);
     BLE_GAP_CONN_SEC_MODE_SET_OPEN(&cccd_md.write_perm);
@@ -137,7 +137,7 @@ static uint32_t cmd_response_char_add(ble_cmd_ctrl_svc_t * p_svc)
     attr_char_value.p_attr_md = &attr_md;
     attr_char_value.init_len  = 0;
     attr_char_value.init_offs = 0;
-    attr_char_value.max_len   = BLE_GATTS_FIX_ATTR_LEN_MAX;  /* SoftDevice max — allows large writes in */
+    attr_char_value.max_len   = BLE_GATTS_FIX_ATTR_LEN_MAX;  /* SoftDevice max - allows large writes in */
     attr_char_value.p_value   = NULL;
 
     return sd_ble_gatts_characteristic_add(p_svc->service_handle,
@@ -149,7 +149,7 @@ static uint32_t cmd_response_char_add(ble_cmd_ctrl_svc_t * p_svc)
 /**
  * @brief Add the Admin Control characteristic (UUID 0x0003).
  *
- * Read + Write, open permissions — deliberately not gated on connection
+ * Read + Write, open permissions - deliberately not gated on connection
  * security.  Accessible even after unpairing → auth bypass vulnerability.
  */
 static uint32_t admin_ctrl_char_add(ble_cmd_ctrl_svc_t * p_svc)
@@ -173,7 +173,7 @@ static uint32_t admin_ctrl_char_add(ble_cmd_ctrl_svc_t * p_svc)
     ble_uuid.uuid = BLE_CMD_ADMIN_CHAR_UUID;
 
     memset(&attr_md, 0, sizeof(attr_md));
-    /* VULNERABILITY: open permissions — no pairing / encryption required.
+    /* VULNERABILITY: open permissions - no pairing / encryption required.
      * A real service would use BLE_GAP_CONN_SEC_MODE_SET_ENC_WITH_MITM
      * or at minimum BLE_GAP_CONN_SEC_MODE_SET_ENC_NO_MITM.             */
     BLE_GAP_CONN_SEC_MODE_SET_OPEN(&attr_md.read_perm);
@@ -205,7 +205,7 @@ static uint32_t admin_ctrl_char_add(ble_cmd_ctrl_svc_t * p_svc)
  * @brief Handle writes to the Command Input characteristic.
  *
  * Accepts any payload, stores it verbatim.  No sequence number, no nonce,
- * no HMAC — an attacker can capture and replay writes freely.
+ * no HMAC - an attacker can capture and replay writes freely.
  */
 static void on_cmd_input_write(ble_cmd_ctrl_svc_t           * p_svc,
                                ble_gatts_evt_write_t const  * p_evt_write)
@@ -228,9 +228,9 @@ static void on_cmd_input_write(ble_cmd_ctrl_svc_t           * p_svc,
 /**
  * @brief Handle writes to the Command Response characteristic.
  *
- * VULNERABILITY — BUFFER OVERFLOW:
+ * VULNERABILITY - BUFFER OVERFLOW:
  * The handler copies the incoming data into a fixed 244-byte buffer using
- * memcpy with the *caller-supplied* length — no bounds check.  A write of
+ * memcpy with the *caller-supplied* length - no bounds check.  A write of
  * >244 bytes will overflow m_cmd_response_buf, corrupt adjacent memory,
  * and trigger a HardFault on Cortex-M4.
  *
@@ -243,7 +243,7 @@ static void on_cmd_response_write(ble_cmd_ctrl_svc_t          * p_svc,
                  p_evt_write->len, CMD_RESPONSE_BUF_LEN);
 
     /*
-     * DELIBERATE VULNERABILITY — unsafe memcpy:
+     * DELIBERATE VULNERABILITY - unsafe memcpy:
      *
      *   Buffer size:  CMD_RESPONSE_BUF_LEN (244 bytes)
      *   Copy length:  p_evt_write->len     (attacker-controlled, up to MTU)
@@ -255,18 +255,18 @@ static void on_cmd_response_write(ble_cmd_ctrl_svc_t          * p_svc,
      */
     memcpy(m_cmd_response_buf, p_evt_write->data, p_evt_write->len);
 
-    NRF_LOG_WARNING("[CMD_CTRL] memcpy completed — %s",
+    NRF_LOG_WARNING("[CMD_CTRL] memcpy completed - %s",
                     (p_evt_write->len > CMD_RESPONSE_BUF_LEN)
-                        ? "OVERFLOW — expect HardFault"
+                        ? "OVERFLOW - expect HardFault"
                         : "within bounds");
 }
 
 /**
  * @brief Handle writes to the Admin Control characteristic.
  *
- * VULNERABILITY — AUTH BYPASS:
+ * VULNERABILITY - AUTH BYPASS:
  * This handler stores the admin-state byte without checking the connection
- * security level.  Any connected peer — paired or not — can toggle admin
+ * security level.  Any connected peer - paired or not - can toggle admin
  * state.
  */
 static void on_admin_ctrl_write(ble_cmd_ctrl_svc_t          * p_svc,

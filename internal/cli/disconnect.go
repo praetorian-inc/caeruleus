@@ -60,7 +60,7 @@ func runDisconnect(cmd *cobra.Command, args []string) error {
 		return err != nil || !conn
 	}, 50*time.Millisecond, max)
 	if err != nil {
-		return fmt.Errorf("disconnect did not complete within %ds — bluetoothd still reports Connected=true", disconnectFlags.waitSec)
+		return fmt.Errorf("disconnect did not complete within %ds - bluetoothd still reports Connected=true", disconnectFlags.waitSec)
 	}
 	fmt.Printf("%s disconnected\n", addr)
 	return nil

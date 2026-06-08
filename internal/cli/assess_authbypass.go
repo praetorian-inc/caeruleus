@@ -18,7 +18,7 @@ func newAssessAuthBypassCmd() *cobra.Command {
 		Use:   "auth-bypass",
 		Short: "What an unpaired attacker can read (and optionally write) on -b BDADDR",
 		Long: `Drops any existing bond, connects unauthenticated, and attempts to read
-every characteristic — classifying each as readable-without-auth,
+every characteristic - classifying each as readable-without-auth,
 auth-required, denied, or error. Values that look like secrets
 (passwords, tokens, keys, flags) are escalated.
 
@@ -42,7 +42,7 @@ func runAuthBypass(cmd *cobra.Command, args []string) error {
 	defer cancel()
 
 	// Guarantee an unauthenticated context: purge any stored bond so the
-	// link below is unencrypted. Best-effort — a missing device is fine.
+	// link below is unencrypted. Best-effort - a missing device is fine.
 	if c, e := bluez.Dial(root.adapter); e == nil {
 		_ = c.RemoveDevice(c.DevicePath(addr))
 		c.Close()

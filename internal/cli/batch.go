@@ -19,14 +19,14 @@ func newBatchCmd() *cobra.Command {
 		Short: "Run shell commands from stdin against a single persistent connection",
 		Long: `batch reads shell-mode commands from stdin (one per line) and executes them
 against a single GATT connection. Unlike shell, there is no readline UI, no
-async notification pump, and no prompt — output goes straight to stdout so
+async notification pump, and no prompt - output goes straight to stdout so
 it's safe to pipe and grep.
 
 Commands are the same as the interactive shell (run "shell" then "help" to
 see the list). Blank lines and lines starting with "#" are ignored.
 
 Notifications: the inline 'listen' shell-mode command works in batch but is
-strictly sequential — it subscribes only when its line is reached, so any
+strictly sequential - it subscribes only when its line is reached, so any
 notification fired by an earlier 'write' may already be gone. For atomic
 trigger-then-listen, use the standalone subcommand instead:
 
@@ -78,7 +78,7 @@ func runBatch(cmd *cobra.Command, args []string) error {
 		notify:   map[uint16]chan struct{}{},
 	}
 
-	// Auto-connect if a bdaddr was supplied — saves the user from typing
+	// Auto-connect if a bdaddr was supplied - saves the user from typing
 	// `connect` as the first line of every batch.
 	if addr != "" {
 		sh.cmdConnect(ctx, nil)

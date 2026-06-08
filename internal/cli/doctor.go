@@ -151,7 +151,7 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	// ExitError instead of calling os.Exit directly keeps the exit-point
 	// in main.go and lets cobra finish its own cleanup first. Code 2
 	// distinguishes "checks failed" from cobra's default 1 ("command
-	// itself errored") — convention shared with grep / diff.
+	// itself errored") - convention shared with grep / diff.
 	for _, f := range findings {
 		if f.Status == "FAIL" {
 			return &ExitError{Code: 2}

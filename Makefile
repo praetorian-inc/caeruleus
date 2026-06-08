@@ -16,15 +16,15 @@ harness:
 
 test: test-unit build harness test-shell
 
-# Pure Go unit tests — no BLE peripheral required. Safe to run in CI.
+# Pure Go unit tests - no BLE peripheral required. Safe to run in CI.
 test-unit:
 	go test ./...
 
-# Shell smoke tests — no BLE peripheral required. Safe to run in CI.
+# Shell tests - no BLE peripheral required. Safe to run in CI.
 test-shell: build harness
 	$(HARNESS) --keep-running
 
-# Smoke + device tests against a real BLE peripheral. Usage:
+# Tests against a real BLE peripheral. Usage:
 #   make test-shell-device ADDR=XX:XX:XX:XX:XX:XX
 test-shell-device: build harness
 	@if [ -z "$(ADDR)" ]; then \

@@ -1,7 +1,7 @@
 ---
 name: caeruleus
 description: Use when performing hardware-agnostic BLE security testing on Linux/BlueZ - device scanning, GATT enumeration, read/write/notify interaction, fuzzing, and security assessment (unauthenticated read/write exposure, encryption enforcement, DFU entry, write-without-response abuse, connection parameters). Drives the single Go `caeruleus` binary; no separate server process, no external tool wrapping.
-compatibility: Linux with BlueZ (bluetoothd) and a standard BLE adapter; build with the Go toolchain (1.25+). Some commands require root (raw HCI/L2CAP sockets). Harness-agnostic — usable from any Agent Skills-compatible agent.
+compatibility: Linux with BlueZ (bluetoothd) and a standard BLE adapter; build with the Go toolchain (1.25+). Some commands require root (raw HCI/L2CAP sockets). Harness-agnostic - usable from any Agent Skills-compatible agent.
 allowed-tools: Bash Read
 ---
 
@@ -18,7 +18,7 @@ Scope is deliberately **hardware-agnostic and self-contained**: it needs only a 
 - Fuzzing a writable characteristic for crashes/hangs (with an on-disk corpus).
 - Recovering a wedged adapter / stuck BlueZ connection during testing.
 
-If the task needs off-path sniffing of *other* devices' traffic, or a MITM relay/peripheral clone, that is out of scope for this tool — use dedicated sniffer/relay hardware separately.
+If the task needs off-path sniffing of *other* devices' traffic, or a MITM relay/peripheral clone, that is out of scope for this tool - use dedicated sniffer/relay hardware separately.
 
 ## Prerequisites & Build
 
@@ -56,12 +56,12 @@ sudo chmod 0440 /etc/sudoers.d/caeruleus
 
 Apply to every subcommand:
 
-- `-b, --bdaddr XX:XX:XX:XX:XX:XX` — target peripheral (required by most commands).
-- `-i, --adapter hciN` — adapter (default `hci0`).
-- `--addr-type public|random` — force address type (auto if blank; some peripherals advertise as `random`).
-- `-t, --timeout N` — per-operation timeout, seconds (default 25).
-- `-o, --format text|json|jsonl` — **always use `json` when orchestrating**; `text` renders human tables.
-- `-v, --verbose` / `-q, --quiet` — stderr diagnostics / suppress status lines.
+- `-b, --bdaddr XX:XX:XX:XX:XX:XX` - target peripheral (required by most commands).
+- `-i, --adapter hciN` - adapter (default `hci0`).
+- `--addr-type public|random` - force address type (auto if blank; some peripherals advertise as `random`).
+- `-t, --timeout N` - per-operation timeout, seconds (default 25).
+- `-o, --format text|json|jsonl` - **always use `json` when orchestrating**; `text` renders human tables.
+- `-v, --verbose` / `-q, --quiet` - stderr diagnostics / suppress status lines.
 
 ## Command reference
 
@@ -80,7 +80,7 @@ Apply to every subcommand:
 | `shell -b A` / `batch -b A` / `serve`+`send` | Interactive REPL / stdin script / persistent warm-link daemon. |
 
 ### Security assessment (structured findings)
-All emit `{address, test, summary, findings[]}`; findings carry `severity` (info/low/medium/high/critical), `handle`, `uuid`, `evidence`, `detail`. **These exit 0 even when issues are found** — findings are data.
+All emit `{address, test, summary, findings[]}`; findings carry `severity` (info/low/medium/high/critical), `handle`, `uuid`, `evidence`, `detail`. **These exit 0 even when issues are found** - findings are data.
 
 | Command | What it tests |
 |---|---|
@@ -158,4 +158,4 @@ Then **correlate**: merge all `findings[]`, dedupe by `(uuid, title)`, rank by s
 - **Stuck state:** "Operation already in progress" / `Connected=true` that won't clear → `caeruleus forget -b A` then retry, or `caeruleus adapter power cycle`. `caeruleus doctor` suggests the fix.
 - **Single-connection peripherals:** many small devices accept one central at a time. Disconnect (the tool does this on exit) before re-running, or use `serve`/`send` to hold one warm link across many operations.
 - **Pairing rejection is a result,** not a failure: `pair`/`assess encryption` exit 0 and record it.
-- **`assess wwr` and `assess dfu --probe-entry` are active/destructive** — only run against targets you can recover (they may reset the device).
+- **`assess wwr` and `assess dfu --probe-entry` are active/destructive** - only run against targets you can recover (they may reset the device).

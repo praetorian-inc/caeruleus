@@ -2,7 +2,7 @@
 // inbound ATT notification / indication PDUs from the raw HCI traffic.
 //
 // This is the same interface btmon(1) uses. With it caeruleus can observe
-// notifications that BlueZ's D-Bus layer hides — for example notifications
+// notifications that BlueZ's D-Bus layer hides - for example notifications
 // pushed by a peripheral on a characteristic that does not advertise the
 // NOTIFY property bit, or immediate-fire notifications that race past
 // PropertiesChanged subscribers.
@@ -34,7 +34,7 @@ const (
 	// or monitor socket; per-device sockets use the index instead.
 	HCI_DEV_NONE = 0xFFFF
 
-	// Monitor header opcodes — see kernel net/bluetooth/hci_sock.c.
+	// Monitor header opcodes - see kernel net/bluetooth/hci_sock.c.
 	monOpcodeNewIndex   = 0x0000
 	monOpcodeDelIndex   = 0x0001
 	monOpcodeCommandPkt = 0x0002
@@ -46,14 +46,14 @@ const (
 	monOpcodeOpenIndex  = 0x0008
 	monOpcodeCloseIndex = 0x0009
 
-	// ATT opcodes we extract — Core Spec Vol 3 Part F.
+	// ATT opcodes we extract - Core Spec Vol 3 Part F.
 	ATTOpNotification = 0x1B
 	ATTOpIndication   = 0x1D
 
 	// L2CAP CID for the Attribute Protocol fixed channel.
 	cidATT = 0x0004
 
-	// HCI event decoding — Core Spec Vol 4 Part E. The LE Meta event (0x3E)
+	// HCI event decoding - Core Spec Vol 4 Part E. The LE Meta event (0x3E)
 	// carries the LE subevents we use to recover connection parameters that
 	// BlueZ does not surface over D-Bus.
 	hciEvtLEMeta         = 0x3E
@@ -139,7 +139,7 @@ func (m *Monitor) Run(ctx context.Context, out chan<- Notification) error {
 // event (Connection Complete / Enhanced Connection Complete / Connection
 // Update Complete) to out. Same lifecycle as Run: out is closed before return.
 // This is how connection parameters (interval / latency / supervision timeout)
-// are recovered — BlueZ does not expose them over D-Bus.
+// are recovered - BlueZ does not expose them over D-Bus.
 func (m *Monitor) RunConn(ctx context.Context, out chan<- ConnEvent) error {
 	defer close(out)
 	return m.readLoop(ctx, func(pkt []byte) bool {
@@ -222,7 +222,7 @@ func parsePacket(pkt []byte) (Notification, bool) {
 }
 
 // parseACL extracts an ATT notify/indicate from a raw HCI ACL packet. This
-// handles only first-fragment / non-fragmented frames — typical notifications
+// handles only first-fragment / non-fragmented frames - typical notifications
 // fit in a single ACL packet on BLE (ATT MTU defaults to 23, ACL data length
 // is much larger), so reassembly is not required for the common case.
 func parseACL(acl []byte, index uint16) (Notification, bool) {
@@ -272,7 +272,7 @@ func parseACL(acl []byte, index uint16) (Notification, bool) {
 
 // ConnEvent is a parsed LE connection-parameter event. It comes either from
 // the initial Connection Complete (Updated=false, PeerAddr populated) or a
-// later Connection Update Complete (Updated=true, PeerAddr empty — the event
+// later Connection Update Complete (Updated=true, PeerAddr empty - the event
 // is keyed only by connection handle, so callers correlate on ConnHandle).
 //
 // The raw interval / latency / timeout are in HCI units; the helper methods

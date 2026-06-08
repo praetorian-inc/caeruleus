@@ -11,7 +11,7 @@ import (
 	"caeruleus/internal/l2cap"
 )
 
-// rawWriteFlags backs the `caeruleus raw-write` command — a single-shot,
+// rawWriteFlags backs the `caeruleus raw-write` command - a single-shot,
 // arbitrary-length ATT Write Request over a raw L2CAP socket. Bypasses
 // BlueZ's per-char MTU enforcement and long-write fragmentation so we
 // can test single-PDU writes that the spec wouldn't otherwise allow.
@@ -102,7 +102,7 @@ func runRawWrite(cmd *cobra.Command, args []string) error {
 	statusf("dialing L2CAP CID 0x0004 -> %s (type=%s)", addrStr, root.addrType)
 	conn, err := l2cap.Dial(peer, at)
 	if err != nil && isResourceBusy(err) {
-		logf("L2CAP EBUSY — disconnecting BlueZ from %s and retrying", addrStr)
+		logf("L2CAP EBUSY - disconnecting BlueZ from %s and retrying", addrStr)
 		if derr := detachBlueZ(addrStr); derr != nil {
 			return fmt.Errorf("detach BlueZ: %w (original dial error: %v)", derr, err)
 		}

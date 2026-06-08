@@ -35,7 +35,7 @@ const (
 	BDADDRLEPublic = 1
 	BDADDRLERandom = 2
 
-	// ATT opcodes — Core Spec Vol 3 Part F.
+	// ATT opcodes - Core Spec Vol 3 Part F.
 	OpErrorResponse           = 0x01
 	OpReadRequest             = 0x0A
 	OpReadResponse            = 0x0B
@@ -66,7 +66,7 @@ type Conn struct {
 // the first byte is what you'd write at the left of an "AA:BB:..." MAC
 // string. The kernel reverses internally for the wire little-endian form.
 //
-// peerAddrType is BDADDRLEPublic or BDADDRLERandom — usually Public for
+// peerAddrType is BDADDRLEPublic or BDADDRLERandom - usually Public for
 // most off-the-shelf peripherals.
 func Dial(peer [6]byte, peerAddrType uint8) (*Conn, error) {
 	fd, err := unix.Socket(unix.AF_BLUETOOTH, unix.SOCK_SEQPACKET|unix.SOCK_CLOEXEC, unix.BTPROTO_L2CAP)
@@ -92,7 +92,7 @@ func Dial(peer [6]byte, peerAddrType uint8) (*Conn, error) {
 		return nil, fmt.Errorf("connect L2CAP ATT to %02X:%02X:%02X:%02X:%02X:%02X: %w "+
 			"(if BlueZ has no active LE link, run a BlueZ command first to bring it up; "+
 			"if BlueZ does and this still fails, the kernel may not allow a second socket "+
-			"on the same CID — fall back to HCI_CHANNEL_USER or stop bluetoothd)",
+			"on the same CID - fall back to HCI_CHANNEL_USER or stop bluetoothd)",
 			peer[0], peer[1], peer[2], peer[3], peer[4], peer[5], err)
 	}
 	return &Conn{fd: fd}, nil
@@ -151,7 +151,7 @@ func (c *Conn) WriteRequest(handle uint16, value []byte, timeout time.Duration) 
 	}
 }
 
-// WriteCommand sends ATT Write Command (opcode 0x52) — write without
+// WriteCommand sends ATT Write Command (opcode 0x52) - write without
 // response. No reply expected; returns once the kernel accepts the send.
 func (c *Conn) WriteCommand(handle uint16, value []byte) error {
 	pdu := make([]byte, 3+len(value))
@@ -194,7 +194,7 @@ func (c *Conn) ReadRequest(handle uint16, timeout time.Duration) (Response, erro
 // WriteRequestEx is the structured-response variant of WriteRequest.
 // Transport errors (socket dead, timeout) return err != nil; an ATT
 // Error Response is a successful return with Response.Opcode ==
-// OpErrorResponse, which is what the fuzzer wants — an error code from
+// OpErrorResponse, which is what the fuzzer wants - an error code from
 // the peripheral is signal, not failure.
 func (c *Conn) WriteRequestEx(handle uint16, value []byte, timeout time.Duration) (Response, error) {
 	pdu := make([]byte, 3+len(value))
@@ -206,7 +206,7 @@ func (c *Conn) WriteRequestEx(handle uint16, value []byte, timeout time.Duration
 
 // PrepareWrite sends ATT Prepare Write Request (0x16). The peripheral
 // queues (handle, offset, value) and echoes it back in the Prepare Write
-// Response — the response Body is the echoed write. Multiple Prepare
+// Response - the response Body is the echoed write. Multiple Prepare
 // Writes can accumulate before an Execute Write commits or cancels them.
 func (c *Conn) PrepareWrite(handle uint16, offset uint16, value []byte, timeout time.Duration) (Response, error) {
 	pdu := make([]byte, 5+len(value))
@@ -227,7 +227,7 @@ func (c *Conn) ExecuteWrite(flags uint8, timeout time.Duration) (Response, error
 }
 
 // requestAndRead sends pdu, then reads up to MaxRespSize bytes back and
-// parses the response. expectReq is the opcode being sent — used only
+// parses the response. expectReq is the opcode being sent - used only
 // for the diagnostic in the "unexpected response" path.
 func (c *Conn) requestAndRead(pdu []byte, expectReq uint8, timeout time.Duration) (Response, error) {
 	if _, err := unix.Write(c.fd, pdu); err != nil {

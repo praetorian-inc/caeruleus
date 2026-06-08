@@ -82,7 +82,7 @@ func runWrite(cmd *cobra.Command, args []string) error {
 		// pflag absorbs --req as the value when the user passed an empty
 		// string. Catch it explicitly so the error is actionable.
 		if strings.HasPrefix(writeFlags.hexVal, "--") {
-			return fmt.Errorf("--value/-n received %q — looks like an upstream `$(read --extract)` returned empty; quote with double quotes or check the prior command's exit code", writeFlags.hexVal)
+			return fmt.Errorf("--value/-n received %q - looks like an upstream `$(read --extract)` returned empty; quote with double quotes or check the prior command's exit code", writeFlags.hexVal)
 		}
 		payload, err = parseHexBytes(writeFlags.hexVal)
 		if err != nil {
@@ -161,10 +161,10 @@ func formatWriteLine(handle uint16, payload []byte, wtype bluez.WriteType) strin
 // reads. By waiting for EOF first, the producer completes naturally, then
 // we connect once and replay all the payloads through one session.
 //
-// Memory cost is negligible — per-line BLE payloads are small (≤ MTU,
+// Memory cost is negligible - per-line BLE payloads are small (≤ MTU,
 // typically <512 bytes) and N is dictated by the producer's output. The
 // trade-off vs streaming is non-existent in practice: there's no use case
-// for "submit one payload, then wait, then submit another" — that's just
+// for "submit one payload, then wait, then submit another" - that's just
 // two separate `caeruleus write` calls.
 func runWriteEachLine() error {
 	addr, err := requireBdaddr()

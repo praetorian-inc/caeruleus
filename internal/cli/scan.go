@@ -28,7 +28,7 @@ func newScanCmd() *cobra.Command {
 		Use:   "scan",
 		Short: "Scan for nearby BLE devices",
 		Long: `scan starts LE device discovery and lists every device BlueZ knows about
-after the scan window — both freshly-advertised devices (InterfacesAdded
+after the scan window - both freshly-advertised devices (InterfacesAdded
 events) and devices BlueZ had cached from before. Pass --new to suppress
 the cached set if you only want devices that advertised in this window.
 
@@ -90,7 +90,7 @@ func runScan(cmd *cobra.Command, args []string) error {
 
 	// By default include devices BlueZ has cached from before this scan
 	// window. They surface only via GetManagedObjects, not InterfacesAdded,
-	// so a pure event-driven scan misses them — which led to confusing
+	// so a pure event-driven scan misses them - which led to confusing
 	// "device not found" results when bluetoothd thought a stale device
 	// was still around. --new opts back into event-only mode.
 	seen := map[dbus.ObjectPath]bluez.DeviceInfo{}
@@ -165,7 +165,7 @@ loop:
 			}
 		}
 		if freshSeen == 0 {
-			fmt.Println("no devices found (LE scan returned zero advertisement events — radio may be wedged; try: caeruleus adapter power cycle)")
+			fmt.Println("no devices found (LE scan returned zero advertisement events - radio may be wedged; try: caeruleus adapter power cycle)")
 		} else {
 			fmt.Println("no devices found")
 		}

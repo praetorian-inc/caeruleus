@@ -28,14 +28,14 @@ func newMonitorCmd() *cobra.Command {
 		Long: `monitor opens the kernel's HCI_CHANNEL_MONITOR socket (same interface as btmon)
 and decodes inbound ATT Handle Value Notification (0x1B) and Indication (0x1D)
 PDUs. This bypasses BlueZ entirely, so it picks up notifications that bluetoothd
-filters out — e.g. on characteristics that don't advertise NOTIFY, or
+filters out - e.g. on characteristics that don't advertise NOTIFY, or
 immediate-fire notifications that race past D-Bus subscribers.
 
 Requires root or CAP_NET_RAW + CAP_NET_ADMIN. Output is caeruleus's normal
 notification format; use --json for structured output.
 
-Note on --handle: this filters on the ATT handle inside the PDU — i.e. the
-handle the peripheral reports the notification *on the wire* — which is
+Note on --handle: this filters on the ATT handle inside the PDU - i.e. the
+handle the peripheral reports the notification *on the wire* - which is
 not always the char value handle you subscribed against. The hidden-CCCD
 case is the canonical surprise: some peripherals emit the notification on
 the CCCD handle itself (the descriptor right after the char value handle)
@@ -43,10 +43,10 @@ rather than on the char's value handle. If a tight filter sees nothing,
 drop the filter once to discover the actual emit handle.`,
 		RunE: runMonitor,
 	}
-	c.Flags().StringVarP(&monitorFlags.handle, "handle", "a", "", "only print events whose PDU att-handle matches (NOT the subscribed char — drop the filter first if unsure)")
+	c.Flags().StringVarP(&monitorFlags.handle, "handle", "a", "", "only print events whose PDU att-handle matches (NOT the subscribed char - drop the filter first if unsure)")
 	c.Flags().IntVarP(&monitorFlags.duration, "duration", "d", 10, "stop after this many seconds (0 = forever)")
 	c.Flags().IntVar(&monitorFlags.count, "count", 0, "stop after receiving this many events (0 = no limit)")
-	c.Flags().BoolVar(&monitorFlags.extract, "extract", false, "print just the hex payload per event (one line each) — parity with listen --extract")
+	c.Flags().BoolVar(&monitorFlags.extract, "extract", false, "print just the hex payload per event (one line each) - parity with listen --extract")
 	return c
 }
 

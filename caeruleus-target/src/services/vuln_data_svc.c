@@ -1,5 +1,5 @@
 /**
- * vuln_data_svc.c — Vulnerable Data Service (0xBEEF) implementation
+ * vuln_data_svc.c - Vulnerable Data Service (0xBEEF) implementation
  *
  * Deliberately vulnerable BLE service for security testing.
  *
@@ -139,7 +139,7 @@ static uint32_t char_add_readwrite(uint16_t           uuid,
 
 /**
  * @brief Handle GATTS write events for the Auth Token and Session Key
- *        characteristics.  Stores whatever the central wrote — no validation.
+ *        characteristics.  Stores whatever the central wrote - no validation.
  */
 static void on_write(ble_evt_t const *p_ble_evt)
 {

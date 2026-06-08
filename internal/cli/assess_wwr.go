@@ -21,9 +21,9 @@ func newAssessWWRCmd() *cobra.Command {
 		Short: "Write-without-response overflow + rapid-fire resilience on -b BDADDR",
 		Long: `Stress-tests every characteristic that advertises Write-Without-Response:
 
-  1. Size sweep — sends increasingly large 0x41-filled payloads; a disconnect
+  1. Size sweep - sends increasingly large 0x41-filled payloads; a disconnect
      after a given size suggests a buffer-overflow / oversized-write crash.
-  2. Rapid-fire — sends a burst of small write-commands back-to-back to probe
+  2. Rapid-fire - sends a burst of small write-commands back-to-back to probe
      for resource exhaustion / queue overrun.
 
 Liveness is checked after each step by reading a known-readable handle. This
@@ -106,7 +106,7 @@ sweep:
 				Handle:   ch.Handle,
 				UUID:     ch.UUID,
 				Evidence: fmt.Sprintf("disconnected after a burst of %d write-commands", wwrFlags.burst),
-				Detail:   "Liveness probe failed after a back-to-back burst — possible resource exhaustion.",
+				Detail:   "Liveness probe failed after a back-to-back burst - possible resource exhaustion.",
 			})
 			crashed = true
 			break sweep

@@ -1,4 +1,4 @@
-# BLE Security Testing Agents — Design Document
+# BLE Security Testing Agents - Design Document
 
 **Date:** 2026-03-05
 **Project:** proteus-ble
@@ -10,9 +10,9 @@ Praetorian consultants perform BLE security assessments on client IoT devices du
 
 ## Goals
 
-- **Speed** — Compress manual BLE recon/testing from hours to minutes
-- **Consistency** — Every engagement hits the same checklist regardless of operator
-- **Depth** — Enable automated fuzzing and analysis impractical to do manually
+- **Speed** - Compress manual BLE recon/testing from hours to minutes
+- **Consistency** - Every engagement hits the same checklist regardless of operator
+- **Depth** - Enable automated fuzzing and analysis impractical to do manually
 
 ## Integration Target
 
@@ -48,7 +48,7 @@ Agent provides a step-by-step choreography document, kicks off background captur
 
 > **Sequential when interacting with the DUT. Parallel only when operating on offline artifacts (pcaps, GATT maps, logs).**
 
-BLE has a single active connection — two agents writing simultaneously would corrupt state or cause disconnects. Phase agents execute sequentially through the DUT interaction phases. `ble-reporter` may run in parallel with upstream agents since it only consumes offline artifacts.
+BLE has a single active connection - two agents writing simultaneously would corrupt state or cause disconnects. Phase agents execute sequentially through the DUT interaction phases. `ble-reporter` may run in parallel with upstream agents since it only consumes offline artifacts.
 
 ---
 
@@ -57,10 +57,10 @@ BLE has a single active connection — two agents writing simultaneously would c
 | Agent | Role | Receives From | Sends To |
 |-------|------|---------------|----------|
 | `ble-orchestrator` | Coordinates full engagement, manages operator interaction, tracks progress | Operator (engagement scope) | All phase agents |
-| `ble-recon` | Phase 1 — Discovery & Enumeration (flows 1.1–1.5) | Orchestrator (target params) | `ble-analyst`, `ble-attacker`, `ble-reporter` |
-| `ble-analyst` | Phase 2 — Protocol Analysis (flows 2.1–2.6) | `ble-recon` (GATT map, device fingerprint) | `ble-attacker`, `ble-reporter` |
-| `ble-attacker` | Phase 3 — Active Testing (flows 3.1–3.8) | `ble-recon` (GATT map), `ble-analyst` (security posture) | `ble-reporter` |
-| `ble-reporter` | Phase 4 — Reporting & Evidence (flows 4.1–4.6) | All upstream agents (findings, artifacts) | Operator (deliverables) |
+| `ble-recon` | Phase 1 - Discovery & Enumeration (flows 1.1 - 1.5) | Orchestrator (target params) | `ble-analyst`, `ble-attacker`, `ble-reporter` |
+| `ble-analyst` | Phase 2 - Protocol Analysis (flows 2.1 - 2.6) | `ble-recon` (GATT map, device fingerprint) | `ble-attacker`, `ble-reporter` |
+| `ble-attacker` | Phase 3 - Active Testing (flows 3.1 - 3.8) | `ble-recon` (GATT map), `ble-analyst` (security posture) | `ble-reporter` |
+| `ble-reporter` | Phase 4 - Reporting & Evidence (flows 4.1 - 4.6) | All upstream agents (findings, artifacts) | Operator (deliverables) |
 
 ### Data Flow
 
@@ -73,29 +73,29 @@ BLE has a single active connection — two agents writing simultaneously would c
                              ▼
                     ┌──────────────────┐
                     │    ble-recon     │
-                    │  1.1–1.5        │
+                    │  1.1 - 1.5        │
                     └───┬──────┬──────┘
               GATT map  │      │  device fingerprint
                    ┌────▼──┐   │
                    │  ble-  │   │
                    │analyst │   │
-                   │2.1–2.6 │   │
+                   │2.1 - 2.6 │   │
                    └──┬─────┘   │
         security      │        │
         posture  ┌────▼────────▼──┐
                  │  ble-attacker   │
-                 │  3.1–3.8       │
+                 │  3.1 - 3.8       │
                  └───────┬────────┘
                          │ all findings + artifacts
                     ┌────▼─────────┐
                     │ ble-reporter │
-                    │ 4.1–4.6     │
+                    │ 4.1 - 4.6     │
                     └──────────────┘
 ```
 
 ---
 
-## Phase 1: Discovery & Enumeration — `ble-recon`
+## Phase 1: Discovery & Enumeration - `ble-recon`
 
 | # | Flow | Pattern | Description |
 |---|------|---------|-------------|
@@ -109,7 +109,7 @@ BLE has a single active connection — two agents writing simultaneously would c
 
 ---
 
-## Phase 2: Protocol Analysis — `ble-analyst`
+## Phase 2: Protocol Analysis - `ble-analyst`
 
 | # | Flow | Pattern | Description |
 |---|------|---------|-------------|
@@ -124,7 +124,7 @@ BLE has a single active connection — two agents writing simultaneously would c
 
 ---
 
-## Phase 3: Active Testing — `ble-attacker`
+## Phase 3: Active Testing - `ble-attacker`
 
 | # | Flow | Pattern | Description |
 |---|------|---------|-------------|
@@ -132,7 +132,7 @@ BLE has a single active connection — two agents writing simultaneously would c
 | 3.2 | Characteristic Fuzzing Execution | Prompt-and-Wait | Executes generated harnesses, monitors for crashes/hangs/unexpected responses, logs anomalies with exact triggering input. Pauses if device crashes for operator power-cycle. |
 | 3.3 | Write-Without-Response Abuse | Fully Automated | Tests all characteristics supporting write-without-response for: buffer overflow via oversized writes, rapid-fire writes for resource exhaustion, out-of-range value injection. |
 | 3.4 | MITM / Relay Attack | Prepare-Execute-Capture | Sets up GATTacker/BtleJuice MITM relay between companion app and device. Agent configures proxy, prompts operator for physical placement, captures and decodes proxied GATT traffic, identifies modifiable values in transit. |
-| 3.5 | Replay Attack Testing | Prepare-Execute-Capture | Captures authenticated write sequences (prompts operator to perform normal action via app), then replays after unpairing/re-pairing. Tests whether device accepts stale commands — identifies missing replay protection. |
+| 3.5 | Replay Attack Testing | Prepare-Execute-Capture | Captures authenticated write sequences (prompts operator to perform normal action via app), then replays after unpairing/re-pairing. Tests whether device accepts stale commands - identifies missing replay protection. |
 | 3.6 | Authentication Bypass Testing | Prompt-and-Wait | Systematically tests: accessing protected characteristics without pairing, with legacy pairing, with manipulated IO capabilities, with stolen/replayed LTK. Operator may need to pair/unpair between tests. |
 | 3.7 | Firmware Update Mechanism Testing | Async Choreography | If DFU service detected (Nordic DFU, TI OAD, etc.): tests for unsigned firmware acceptance, version downgrade, partial update handling. Agent provides step sequence, operator triggers DFU mode on device. |
 | 3.8 | Notification Spoofing / Injection | Prepare-Execute-Capture | Clones device's GATT profile, advertises as the target device, tests whether companion app validates device identity, injects crafted notification data. Agent sets up spoofed peripheral, prompts operator to connect companion app. |
@@ -141,7 +141,7 @@ BLE has a single active connection — two agents writing simultaneously would c
 
 ---
 
-## Phase 4: Reporting & Evidence Collection — `ble-reporter`
+## Phase 4: Reporting & Evidence Collection - `ble-reporter`
 
 | # | Flow | Pattern | Description |
 |---|------|---------|-------------|
@@ -187,42 +187,42 @@ Data flows between agents via **file-based persistence** in a shared engagement 
 ├── config/
 │   └── engagement.json                    # Engagement scope & target parameters
 ├── recon/                                 # ble-recon outputs (Phase 1)
-│   ├── device-inventory.json              # 1.1 — All discovered devices
-│   ├── gatt-map.json                      # 1.2 — Full GATT hierarchy per device
-│   ├── characteristic-probes.json         # 1.3 — Permission test results
-│   ├── device-fingerprint.json            # 1.4 — Chipset/firmware/CVE matches
-│   └── advertisement-analysis.json        # 1.5 — Decoded advertisement data
+│   ├── device-inventory.json              # 1.1 - All discovered devices
+│   ├── gatt-map.json                      # 1.2 - Full GATT hierarchy per device
+│   ├── characteristic-probes.json         # 1.3 - Permission test results
+│   ├── device-fingerprint.json            # 1.4 - Chipset/firmware/CVE matches
+│   └── advertisement-analysis.json        # 1.5 - Decoded advertisement data
 ├── analysis/                              # ble-analyst outputs (Phase 2)
-│   ├── pairing-analysis.json              # 2.1 — Pairing method assessment
-│   ├── encryption-assessment.json         # 2.2 — Encryption enforcement results
-│   ├── notification-traffic.json          # 2.3 — Captured notification data
-│   ├── gatt-security-audit.json           # 2.4 — Spec compliance findings
-│   ├── captures/                          # 2.5 — Raw packet captures
+│   ├── pairing-analysis.json              # 2.1 - Pairing method assessment
+│   ├── encryption-assessment.json         # 2.2 - Encryption enforcement results
+│   ├── notification-traffic.json          # 2.3 - Captured notification data
+│   ├── gatt-security-audit.json           # 2.4 - Spec compliance findings
+│   ├── captures/                          # 2.5 - Raw packet captures
 │   │   └── *.pcap
-│   ├── sniff-decode.json                  # 2.5 — Decoded sniff summary
-│   ├── connection-params.json             # 2.6 — Connection parameter analysis
+│   ├── sniff-decode.json                  # 2.5 - Decoded sniff summary
+│   ├── connection-params.json             # 2.6 - Connection parameter analysis
 │   └── security-posture.json              # Aggregated Phase 2 summary
 ├── attacks/                               # ble-attacker outputs (Phase 3)
-│   ├── harnesses/                         # 3.1 — Generated fuzzing scripts
+│   ├── harnesses/                         # 3.1 - Generated fuzzing scripts
 │   │   └── fuzz-{service}-{char}.py
-│   ├── fuzz-results.json                  # 3.2 — Fuzzing execution results
-│   ├── wwr-abuse-results.json             # 3.3 — Write-without-response results
-│   ├── mitm-results.json                  # 3.4 — MITM/relay findings
-│   ├── replay-results.json                # 3.5 — Replay attack results
-│   ├── auth-bypass-results.json           # 3.6 — Auth bypass test results
-│   ├── dfu-analysis.json                  # 3.7 — Firmware update findings
-│   ├── spoofing-results.json              # 3.8 — Notification spoofing results
+│   ├── fuzz-results.json                  # 3.2 - Fuzzing execution results
+│   ├── wwr-abuse-results.json             # 3.3 - Write-without-response results
+│   ├── mitm-results.json                  # 3.4 - MITM/relay findings
+│   ├── replay-results.json                # 3.5 - Replay attack results
+│   ├── auth-bypass-results.json           # 3.6 - Auth bypass test results
+│   ├── dfu-analysis.json                  # 3.7 - Firmware update findings
+│   ├── spoofing-results.json              # 3.8 - Notification spoofing results
 │   └── captures/                          # Raw attack traffic
 │       └── *.pcap
 ├── reports/                               # ble-reporter outputs (Phase 4)
-│   ├── gatt-map-visual.svg                # 4.1 — GATT visualization
-│   ├── correlated-findings.json           # 4.2 — Deduplicated, correlated findings
-│   ├── cve-mapping.json                   # 4.3 — CVE cross-references
-│   ├── evidence/                          # 4.4 — Evidence package
+│   ├── gatt-map-visual.svg                # 4.1 - GATT visualization
+│   ├── correlated-findings.json           # 4.2 - Deduplicated, correlated findings
+│   ├── cve-mapping.json                   # 4.3 - CVE cross-references
+│   ├── evidence/                          # 4.4 - Evidence package
 │   │   ├── evidence-manifest.json
 │   │   └── evidence-package.zip
-│   ├── remediation-guide.md               # 4.5 — Remediation recommendations
-│   └── engagement-report.md               # 4.6 — Final summary report
+│   ├── remediation-guide.md               # 4.5 - Remediation recommendations
+│   └── engagement-report.md               # 4.6 - Final summary report
 └── operator-log.json                      # Timestamped log of all operator interactions
 ```
 
@@ -343,7 +343,7 @@ characteristic-probes.json (1.3)                          │    │
 
 #### GATT Map (1.2 → the most critical shared artifact)
 
-This is the backbone schema — Phase 2, 3, and 4 all consume it.
+This is the backbone schema - Phase 2, 3, and 4 all consume it.
 
 ```json
 {
@@ -410,7 +410,7 @@ This is the backbone schema — Phase 2, 3, and 4 all consume it.
 }
 ```
 
-#### Unified Finding Format (produced by Phases 1–3, consumed by Phase 4)
+#### Unified Finding Format (produced by Phases 1 - 3, consumed by Phase 4)
 
 Every agent that discovers a security issue writes findings in this format. The reporter agent aggregates all of them.
 
@@ -468,7 +468,7 @@ Every agent that discovers a security issue writes findings in this format. The 
 
 #### Security Posture Summary (produced by ble-analyst, consumed by ble-attacker)
 
-Key handoff between Phase 2 and Phase 3 — tells the attacker where to focus.
+Key handoff between Phase 2 and Phase 3 - tells the attacker where to focus.
 
 ```json
 {
@@ -578,9 +578,9 @@ All JSON schemas include a `schema_version` field. Agents check version compatib
 
 ## Implementation Architecture
 
-### Decision: Hybrid — Persistent BLE Server + Discrete Analysis Scripts
+### Decision: Hybrid - Persistent BLE Server + Discrete Analysis Scripts
 
-**Rationale:** Unlike Frida (which has `frida-node` as an alternative), the BLE ecosystem is Python-only (`bleak`, `bluepy`, `scapy`, Ubertooth bindings). The Python server is a requirement, not a choice. Session reuse is critical — BLE connection establishment takes 3–15s, and most flows require an active connection. YAML-over-stdin/stdout IPC protocol chosen for ecosystem consistency with malum/draco.
+**Rationale:** Unlike Frida (which has `frida-node` as an alternative), the BLE ecosystem is Python-only (`bleak`, `bluepy`, `scapy`, Ubertooth bindings). The Python server is a requirement, not a choice. Session reuse is critical - BLE connection establishment takes 3 - 15s, and most flows require an active connection. YAML-over-stdin/stdout IPC protocol chosen for ecosystem consistency with malum/draco.
 
 ### Two-Process Architecture
 
@@ -639,31 +639,31 @@ All JSON schemas include a `schema_version` field. Agents check version compatib
 
 | Flow | Architecture | Rationale |
 |------|-------------|-----------|
-| 1.1 BLE Device Discovery | **Server** — `scan` command | Needs adapter access via bleak |
-| 1.2 Service & Char Enumeration | **Server** — `connect` + `get_gatt_map` | Needs active connection |
-| 1.3 Characteristic Probing | **Server** — `probe_permissions` | Needs active connection, iterates all chars |
-| 1.4 Device Fingerprinting | **Offline** — `fingerprint-device.ts` | Reads device-inventory.json, cross-refs databases |
-| 1.5 Advertisement Analysis | **Offline** — `analyze-advertisements.ts` | Parses saved advertisement data |
-| 2.1 Pairing Analysis | **Server** — `pair` + `test_pairing` | Needs active connection, modifies pairing state |
-| 2.2 Encryption Assessment | **Server** — `test_encryption` | Needs connection, toggles encryption states |
-| 2.3 Notification Traffic | **Server** — `subscribe` (long-running) | Needs persistent connection for async notifications |
-| 2.4 GATT Profile Audit | **Offline** — `audit-gatt-profile.ts` | Reads gatt-map.json, cross-refs BT SIG specs |
-| 2.5 Passive Sniffing | **Sniffer server** — `start_capture` | Separate hardware (Ubertooth/Sniffle) |
-| 2.6 Connection Params | **Server** — `get_connection_params` | Needs active connection |
-| 3.1 Fuzz Harness Gen | **Offline** — `generate-fuzz-harness.ts` | Reads gatt-map.json, generates Python scripts |
-| 3.2 Fuzz Execution | **Server** — `fuzz_characteristic` | Needs active connection, monitors for crashes |
-| 3.3 WWR Abuse | **Server** — `write_no_response` | Needs active connection |
-| 3.4 MITM/Relay | **Server** — orchestrates GATTacker | Needs adapter for relay setup |
-| 3.5 Replay Attack | **Server** — `replay_writes` | Needs active connection |
-| 3.6 Auth Bypass | **Server** — `test_auth_bypass` | Needs connection, modifies pairing state |
-| 3.7 DFU Testing | **Server** — `test_dfu` | Needs active connection to DFU service |
-| 3.8 Notification Spoofing | **Server** — `spoof_peripheral` | Needs adapter to advertise as fake device |
-| 4.1 GATT Visualization | **Offline** — `visualize-gatt.ts` | Reads gatt-map.json |
-| 4.2 Finding Correlation | **Offline** — `correlate-findings.ts` | Reads all findings JSONs |
-| 4.3 CVE Mapping | **Offline** — `map-cves.ts` | Reads device-fingerprint.json, queries NVD/CCVERA |
-| 4.4 Evidence Assembly | **Offline** — `assemble-evidence.ts` | Reads all artifacts |
-| 4.5 Remediation Guide | **Offline** — `generate-remediation.ts` | Reads correlated findings |
-| 4.6 Engagement Report | **Offline** — `generate-report.ts` | Reads all upstream artifacts |
+| 1.1 BLE Device Discovery | **Server** - `scan` command | Needs adapter access via bleak |
+| 1.2 Service & Char Enumeration | **Server** - `connect` + `get_gatt_map` | Needs active connection |
+| 1.3 Characteristic Probing | **Server** - `probe_permissions` | Needs active connection, iterates all chars |
+| 1.4 Device Fingerprinting | **Offline** - `fingerprint-device.ts` | Reads device-inventory.json, cross-refs databases |
+| 1.5 Advertisement Analysis | **Offline** - `analyze-advertisements.ts` | Parses saved advertisement data |
+| 2.1 Pairing Analysis | **Server** - `pair` + `test_pairing` | Needs active connection, modifies pairing state |
+| 2.2 Encryption Assessment | **Server** - `test_encryption` | Needs connection, toggles encryption states |
+| 2.3 Notification Traffic | **Server** - `subscribe` (long-running) | Needs persistent connection for async notifications |
+| 2.4 GATT Profile Audit | **Offline** - `audit-gatt-profile.ts` | Reads gatt-map.json, cross-refs BT SIG specs |
+| 2.5 Passive Sniffing | **Sniffer server** - `start_capture` | Separate hardware (Ubertooth/Sniffle) |
+| 2.6 Connection Params | **Server** - `get_connection_params` | Needs active connection |
+| 3.1 Fuzz Harness Gen | **Offline** - `generate-fuzz-harness.ts` | Reads gatt-map.json, generates Python scripts |
+| 3.2 Fuzz Execution | **Server** - `fuzz_characteristic` | Needs active connection, monitors for crashes |
+| 3.3 WWR Abuse | **Server** - `write_no_response` | Needs active connection |
+| 3.4 MITM/Relay | **Server** - orchestrates GATTacker | Needs adapter for relay setup |
+| 3.5 Replay Attack | **Server** - `replay_writes` | Needs active connection |
+| 3.6 Auth Bypass | **Server** - `test_auth_bypass` | Needs connection, modifies pairing state |
+| 3.7 DFU Testing | **Server** - `test_dfu` | Needs active connection to DFU service |
+| 3.8 Notification Spoofing | **Server** - `spoof_peripheral` | Needs adapter to advertise as fake device |
+| 4.1 GATT Visualization | **Offline** - `visualize-gatt.ts` | Reads gatt-map.json |
+| 4.2 Finding Correlation | **Offline** - `correlate-findings.ts` | Reads all findings JSONs |
+| 4.3 CVE Mapping | **Offline** - `map-cves.ts` | Reads device-fingerprint.json, queries NVD/CCVERA |
+| 4.4 Evidence Assembly | **Offline** - `assemble-evidence.ts` | Reads all artifacts |
+| 4.5 Remediation Guide | **Offline** - `generate-remediation.ts` | Reads correlated findings |
+| 4.6 Engagement Report | **Offline** - `generate-report.ts` | Reads all upstream artifacts |
 
 **Split:** 15 server commands, 10 offline scripts, 1 sniffer server command.
 
@@ -776,6 +776,6 @@ PROTEUS_ENGAGEMENT_DIR=          # Override engagement output directory
 
 1. Implement `proteus-ble-server.py` with core connection lifecycle commands (`scan`, `connect`, `disconnect`, `get_gatt_map`, `read_characteristic`, `write_characteristic`)
 2. Implement `lib/client.ts` following malum's singleton pattern
-3. Build `ble-recon` agent (Phase 1) with wrappers for flows 1.1–1.5
+3. Build `ble-recon` agent (Phase 1) with wrappers for flows 1.1 - 1.5
 4. Define `ble:proteus` skill definition following malum/draco SKILL.md pattern
 5. Implement `ble-orchestrator` agent with operator interaction routing

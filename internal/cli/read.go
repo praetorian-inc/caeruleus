@@ -45,7 +45,7 @@ Use -A for ASCII-only (one line, no key/value) or --json for machine output.`,
 	c.Flags().StringVarP(&readFlags.uuid, "uuid", "u", "", "characteristic UUID")
 	c.Flags().Uint16Var(&readFlags.offset, "offset", 0, "read offset (for long reads)")
 	c.Flags().BoolVarP(&readFlags.ascii, "ascii", "A", false, "print just the decoded ASCII payload, no key=value framing")
-	c.Flags().BoolVar(&readFlags.extract, "extract", false, "print just the hex payload (lossless, single line) — pipe to `write -n` for round-trip")
+	c.Flags().BoolVar(&readFlags.extract, "extract", false, "print just the hex payload (lossless, single line) - pipe to `write -n` for round-trip")
 	c.Flags().IntVar(&readFlags.retry, "retry", 0, "retry up to N times when the operation fails with a transient BlueZ/HCI error")
 	c.Flags().DurationVar(&readFlags.retryDelay, "retry-delay", 500*time.Millisecond, "delay between retries (e.g. 250ms, 2s)")
 	c.Flags().BoolVar(&readFlags.watch, "watch", false, "keep re-reading until SIGINT or --duration expires")
@@ -243,7 +243,7 @@ func resolveCharOrDescriptor(s *session, handle, uuid string) (bluez.GattObject,
 	return resolveChar(s, handle, uuid)
 }
 
-// spacedHex formats bytes as "de ad be ef" — matches gatttool's output style.
+// spacedHex formats bytes as "de ad be ef" - matches gatttool's output style.
 func spacedHex(b []byte) string {
 	var sb strings.Builder
 	for i, x := range b {

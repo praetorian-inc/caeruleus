@@ -9,14 +9,14 @@ import (
 
 // clearStuckINQUIRY detects whether the controller is in BR/EDR INQUIRY
 // mode and, if so, runs a soft power-cycle to clear it. The detection
-// uses /sys/class/bluetooth/hciN/inquiry_mode-adjacent state — we look
+// uses /sys/class/bluetooth/hciN/inquiry_mode-adjacent state - we look
 // at the "state" file under /sys/kernel/debug or fall back to parsing
 // hciconfig output if debug fs isn't mounted.
 //
 // We only power-cycle when INQUIRY is actually detected, so callers like
 // bdaddr that depend on the controller's volatile state (e.g. a vendor
 // BD_ADDR write) keep their state intact in the common case. When INQUIRY
-// is present, the power-cycle does wipe volatile state — that's the
+// is present, the power-cycle does wipe volatile state - that's the
 // trade-off, but it leaves the user in a consistent, scannable state
 // rather than mysteriously broken.
 func clearStuckINQUIRY() error {
@@ -27,7 +27,7 @@ func clearStuckINQUIRY() error {
 	if !in {
 		return nil
 	}
-	logf("controller stuck in BR/EDR INQUIRY mode after reset — power-cycling to clear (volatile state will be lost)")
+	logf("controller stuck in BR/EDR INQUIRY mode after reset - power-cycling to clear (volatile state will be lost)")
 	return cyclePower()
 }
 
@@ -41,7 +41,7 @@ func clearStuckINQUIRY() error {
 // hciconfig. Easiest portable check: shell out to hciconfig and look for
 // the INQUIRY substring on the state line. Returns true if INQUIRY is set.
 func adapterInINQUIRY() (bool, error) {
-	// Try hciconfig first — it's stable across kernels and always present
+	// Try hciconfig first - it's stable across kernels and always present
 	// when bluetoothd is installed.
 	if out, err := runHciconfig(root.adapter); err == nil {
 		return strings.Contains(out, " INQUIRY"), nil
@@ -57,7 +57,7 @@ func adapterInINQUIRY() (bool, error) {
 			return n&(1<<5) != 0, nil
 		}
 	}
-	// Couldn't determine — assume not stuck.
+	// Couldn't determine - assume not stuck.
 	return false, nil
 }
 

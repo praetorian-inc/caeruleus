@@ -52,7 +52,7 @@ var listenFlags struct {
 	trigHnd      string
 	trigCount    int           // 0 = single fire (or 1 if --trigger-value)
 	trigInterval time.Duration // gap between repeated triggers
-	monitor      string        // "auto" | "on" | "off" — fan in HCI monitor socket
+	monitor      string        // "auto" | "on" | "off" - fan in HCI monitor socket
 	hiddenCCCD   bool          // if true, don't call StartNotify (for chars without notify)
 	extract      bool
 	retry        int
@@ -102,9 +102,9 @@ Hidden CCCDs:
 	c.Flags().StringVar(&listenFlags.monitor, "monitor", "auto",
 		"fan in HCI monitor socket events too: auto|on|off (auto = on if euid==0)")
 	c.Flags().BoolVar(&listenFlags.hiddenCCCD, "hidden", false,
-		"don't call StartNotify — only watch via HCI monitor (for chars that don't advertise notify; needs --monitor on)")
+		"don't call StartNotify - only watch via HCI monitor (for chars that don't advertise notify; needs --monitor on)")
 	c.Flags().BoolVar(&listenFlags.extract, "extract", false,
-		"print just the hex payload per event (lossless, one line each) — pipe to `write -n`")
+		"print just the hex payload per event (lossless, one line each) - pipe to `write -n`")
 	c.Flags().IntVar(&listenFlags.retry, "retry", 0, "retry the entire listen window up to N times on transient BlueZ/HCI errors")
 	c.Flags().DurationVar(&listenFlags.retryDelay, "retry-delay", 500*time.Millisecond, "delay between retries")
 	return c
@@ -136,7 +136,7 @@ func runListen(cmd *cobra.Command, args []string) error {
 // runListenOnce performs a single listen window. The caller may retry this
 // whole function on transient errors.
 func runListenOnce(addr string) error {
-	// Listen + duration + slack — don't use root --timeout; default is too short.
+	// Listen + duration + slack - don't use root --timeout; default is too short.
 	dur := time.Duration(listenFlags.duration) * time.Second
 	if listenFlags.duration == 0 {
 		dur = 24 * time.Hour
@@ -145,7 +145,7 @@ func runListenOnce(addr string) error {
 	// --trigger-value is set with default --trigger-count=1. Auto-imply
 	// --count 1 in that case so users don't sit through the full duration
 	// waiting for nothing else to fire. If --trigger-count > 1 (multi-fire),
-	// leave --count at 0 (unlimited) — the user clearly wants every response.
+	// leave --count at 0 (unlimited) - the user clearly wants every response.
 	// Override with explicit --count to restore previous behaviour.
 	effectiveCount := listenFlags.count
 	if effectiveCount == 0 && listenFlags.trigger != "" && listenFlags.trigCount <= 1 {
@@ -174,7 +174,7 @@ func runListenOnce(addr string) error {
 	// channel there's literally no event source left. Warn loudly rather
 	// than running a silent no-op.
 	if listenFlags.hiddenCCCD && !wantMonitor {
-		failf("--hidden skips StartNotify and --monitor is off — this listen has no event source and will produce nothing. Re-run with --monitor on (needs sudo) or drop --hidden.")
+		failf("--hidden skips StartNotify and --monitor is off - this listen has no event source and will produce nothing. Re-run with --monitor on (needs sudo) or drop --hidden.")
 	}
 
 	// Bring the monitor up BEFORE connecting so we don't miss the immediate
@@ -205,11 +205,11 @@ func runListenOnce(addr string) error {
 	if !listenFlags.hiddenCCCD {
 		if err := c.StartNotify(); err != nil {
 			// If the char doesn't advertise notify, falling back to monitor-only
-			// is the right move — emit a hint and continue.
+			// is the right move - emit a hint and continue.
 			if monCh == nil {
 				return fmt.Errorf("StartNotify: %w (try --monitor on or --hidden with sudo)", err)
 			}
-			logf("StartNotify failed (%v) — relying on HCI monitor only", err)
+			logf("StartNotify failed (%v) - relying on HCI monitor only", err)
 		} else {
 			defer func() { _ = c.StopNotify() }()
 		}

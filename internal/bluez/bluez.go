@@ -183,7 +183,7 @@ func (d *Device) Exists() bool {
 // Device1 object is not registered on the bus yet, a brief discovery pass is
 // run first (BlueZ purges unpaired peripherals after disconnect). On certain
 // transient failures (I/O error, le-connection-abort-by-local, page timeout)
-// we fall back to RemoveDevice + re-discover + retry once — BlueZ may have
+// we fall back to RemoveDevice + re-discover + retry once - BlueZ may have
 // a stuck Device1 with Connected=true from an ungraceful prior teardown,
 // and only purging the object lets a fresh ACL link complete.
 // timeout caps the whole operation including discovery and service resolution.
@@ -197,7 +197,7 @@ func (d *Device) Connect(ctx context.Context, timeout time.Duration) error {
 		return d.WaitServicesResolved(ctx)
 	case IsStuckConnect(err):
 		// BlueZ's view is wrong (stuck Connected=true, "already in
-		// progress"). Purge the Device1 and try fresh — only safe here
+		// progress"). Purge the Device1 and try fresh - only safe here
 		// because the stuck-Connected state needs a hard reset.
 		_ = d.conn.RemoveDevice(d.Path)
 		time.Sleep(300 * time.Millisecond)
@@ -252,7 +252,7 @@ func hintWrap(err error) error {
 	case strings.Contains(s, "not seen during discovery"):
 		return fmt.Errorf("%w (LE scan may be wedged; try `caeruleus adapter power cycle`)", err)
 	case strings.Contains(s, "le-connection-abort-by-local"):
-		return fmt.Errorf("%w (peripheral aborted the LE link; the firmware may be holding a stale supervision-timeout window — try `caeruleus forget` then retry)", err)
+		return fmt.Errorf("%w (peripheral aborted the LE link; the firmware may be holding a stale supervision-timeout window - try `caeruleus forget` then retry)", err)
 	}
 	return err
 }
@@ -260,7 +260,7 @@ func hintWrap(err error) error {
 // IsTransientError reports whether an error is retry-able at all (either
 // kind of transient). The retry policy splits further into IsStuckConnect
 // (BlueZ state needs purging) vs IsTransientLE (just wait + retry, do NOT
-// purge — RemoveDevice on a discovery-side failure makes things worse).
+// purge - RemoveDevice on a discovery-side failure makes things worse).
 func IsTransientError(err error) bool {
 	return IsStuckConnect(err) || IsTransientLE(err)
 }
@@ -288,7 +288,7 @@ func IsStuckConnect(err error) bool {
 // IsTransientLE matches errors that suggest the LE link / radio is
 // momentarily unhappy but BlueZ's tree is fine. Retry path: wait + retry,
 // keep the cached Device1 (purging it removes the only path we have when
-// fresh discovery is wedged — e.g. post-HCIDEVRESET).
+// fresh discovery is wedged - e.g. post-HCIDEVRESET).
 func IsTransientLE(err error) bool {
 	if err == nil {
 		return false
@@ -335,7 +335,7 @@ func (c *Conn) ensureDeviceVisible(ctx context.Context, devPath dbus.ObjectPath,
 		return err
 	}
 	if err := c.StartDiscovery(); err != nil {
-		// "AlreadyExists" or similar is fine — discovery may already be running.
+		// "AlreadyExists" or similar is fine - discovery may already be running.
 		if !isAlreadyExists(err) {
 			return fmt.Errorf("StartDiscovery: %w", err)
 		}
@@ -397,7 +397,7 @@ func (d *Device) Disconnect() error {
 	return d.obj.Call(IfaceDevice+".Disconnect", 0).Err
 }
 
-// Pair invokes BlueZ Device1.Pair. Best-effort — many peripherals don't require pairing.
+// Pair invokes BlueZ Device1.Pair. Best-effort - many peripherals don't require pairing.
 func (d *Device) Pair() error {
 	return d.obj.Call(IfaceDevice+".Pair", 0).Err
 }
@@ -408,7 +408,7 @@ func (d *Device) CancelPairing() error {
 	return d.obj.Call(IfaceDevice+".CancelPairing", 0).Err
 }
 
-// Paired reports the BlueZ Device1.Paired property — whether a pairing
+// Paired reports the BlueZ Device1.Paired property - whether a pairing
 // procedure has completed for this peer (with or without a stored bond).
 func (d *Device) Paired() (bool, error) {
 	v, err := getProp(d.obj, IfaceDevice, "Paired")
@@ -419,7 +419,7 @@ func (d *Device) Paired() (bool, error) {
 	return b, nil
 }
 
-// Bonded reports the Device1.Bonded property — whether long-term keys are
+// Bonded reports the Device1.Bonded property - whether long-term keys are
 // stored for this peer. Older BlueZ (<5.50) lacks this property; callers
 // should treat the error as "unknown" rather than fatal.
 func (d *Device) Bonded() (bool, error) {
@@ -465,7 +465,7 @@ func (c *Characteristic) UUID() (string, error) {
 }
 
 // Handle returns the BlueZ Handle property (matches ATT handle on the peer).
-// On older BlueZ (<5.57) the property is missing — caller can fall back to
+// On older BlueZ (<5.57) the property is missing - caller can fall back to
 // parsing the object path.
 func (c *Characteristic) Handle() (uint16, error) {
 	v, err := getProp(c.obj, IfaceCharacteristic, "Handle")

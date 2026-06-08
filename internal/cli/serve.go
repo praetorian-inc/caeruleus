@@ -38,7 +38,7 @@ func newServeCmd() *cobra.Command {
 connected Device, so subsequent operations skip the ~1.5s reconnect cost
 per CLI invocation.
 
-The MVP runs single-client serial — one connection at a time, requests
+The MVP runs single-client serial - one connection at a time, requests
 processed in order. Concurrent multi-client support is a future iteration.
 
 Protocol: client connects, sends one or more newline-terminated commands,
@@ -130,11 +130,11 @@ func runServe(cmd *cobra.Command, args []string) error {
 	logf("serving on %s (bdaddr=%s adapter=%s)", serveFlags.socket, addr, root.adapter)
 	fmt.Printf("listening on %s\n", serveFlags.socket)
 
-	// Serial handler — one client at a time. Accept blocks, then we run
+	// Serial handler - one client at a time. Accept blocks, then we run
 	// handleServeConn synchronously in the same goroutine, then loop.
 	// That synchronous pattern is what makes operations serial; no mutex
 	// needed. Going concurrent (goroutine per Accept) would need a real
-	// lock around the shell's state — left for the multi-client iteration.
+	// lock around the shell's state - left for the multi-client iteration.
 	for {
 		c, err := listener.Accept()
 		if err != nil {
@@ -199,7 +199,7 @@ streams the response back to stdout until the sentinel. Useful for scripting
 against a persistent connection without paying the per-call connect cost.
 
 The socket path comes from --socket, or $CAERULEUS_SOCK, or the default
-~/.cache/caeruleus/serve.sock — in that order.
+~/.cache/caeruleus/serve.sock - in that order.
 
 Example:
 

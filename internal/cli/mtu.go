@@ -34,7 +34,7 @@ var mtuFlags struct {
 // ~64 and small peripherals often can't negotiate values much above 247.
 // We warn outside the safe band but still accept it if --force is set.
 //
-// mtuDefault is the value `mtu --reset` writes — intentionally not 517
+// mtuDefault is the value `mtu --reset` writes - intentionally not 517
 // (BLE spec max). The BLE CTF firmware and many small-MCU peripherals
 // refuse MTU > ~247 during ExchangeMTU. 247 is the de-facto floor; use
 // `mtu --reset --to-spec-default` to get the literal 517.
@@ -51,8 +51,8 @@ func newMTUCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "mtu",
 		Short: "Read or set the requested ATT MTU (set/reset require root + bluetoothd restart)",
-		Long: `mtu shows the negotiated ATT MTU for an active connection, or — with
---set / --reset — edits /etc/bluetooth/main.conf and restarts bluetoothd
+		Long: `mtu shows the negotiated ATT MTU for an active connection, or - with
+--set / --reset - edits /etc/bluetooth/main.conf and restarts bluetoothd
 so the next connection exchanges a different MTU.
 
 Notes:
@@ -136,14 +136,14 @@ func runMTU(cmd *cobra.Command, args []string) error {
 			"to accept, or --reset to restore the safe default.",
 			target, mtuSafeMin, mtuSafeMax)
 	}
-	// Check root before touching main.conf or systemctl — partial state
+	// Check root before touching main.conf or systemctl - partial state
 	// here (file edited but restart denied) is worse than a clean refusal.
 	if !mtuFlags.dryRun {
 		if err := requireRoot("mtu --set/--reset/--revert"); err != nil {
 			return err
 		}
 	}
-	// Confirmation prompt (F9) — disruptive op, big hammer.
+	// Confirmation prompt (F9) - disruptive op, big hammer.
 	if !mtuFlags.dryRun && !mtuFlags.yes {
 		if err := confirmDisruptive(fmt.Sprintf("Set ExchangeMTU=%d, disconnect active peripherals, restart bluetoothd?", target)); err != nil {
 			return err
@@ -236,8 +236,7 @@ func applyMTU(mtu uint16) error {
 		logf("%s already requests ExchangeMTU = %d, skipping write", confPath, mtu)
 	}
 
-	// Cleanly disconnect any active peripherals BEFORE killing bluetoothd —
-	// otherwise the remote side keeps its half-link alive until supervision
+	// Cleanly disconnect any active peripherals BEFORE killing bluetoothd - 	// otherwise the remote side keeps its half-link alive until supervision
 	// timeout and won't re-advertise for several seconds.
 	if err := drainConnectedPeripherals(); err != nil {
 		failf("could not drain peripherals before restart: %v", err)
@@ -262,9 +261,9 @@ func applyMTU(mtu uint16) error {
 	}, 300*time.Millisecond, 15*time.Second)
 	if err != nil {
 		return rollbackOrFail(confPath, original,
-			fmt.Errorf("bluetoothd did not come back within 15s — likely rejected MTU=%d", mtu))
+			fmt.Errorf("bluetoothd did not come back within 15s - likely rejected MTU=%d", mtu))
 	}
-	fmt.Printf("ExchangeMTU set to %d on adapter %s — reconnect to take effect.\n", mtu, root.adapter)
+	fmt.Printf("ExchangeMTU set to %d on adapter %s - reconnect to take effect.\n", mtu, root.adapter)
 	return nil
 }
 
@@ -344,7 +343,7 @@ func patchExchangeMTU(text string, mtu uint16) (string, bool, error) {
 		if !sectionRe.MatchString(strings.Join(lines, "\n")) || !containsSection(lines, "GATT") {
 			out = append(out, "", "[GATT]", want)
 		} else {
-			// [GATT] section exists but no MTU key — append the key under it.
+			// [GATT] section exists but no MTU key - append the key under it.
 			out = appendUnderSection(out, "GATT", want)
 		}
 		changed = true
@@ -371,7 +370,7 @@ func appendUnderSection(lines []string, section, line string) []string {
 	for _, l := range lines {
 		trimmed := strings.ToLower(strings.TrimSpace(l))
 		if !inserted && inSection && strings.HasPrefix(trimmed, "[") && strings.HasSuffix(trimmed, "]") {
-			// Hit the next section — insert before it.
+			// Hit the next section - insert before it.
 			out = append(out, line)
 			inserted = true
 		}

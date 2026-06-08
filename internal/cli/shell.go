@@ -116,7 +116,7 @@ func runShell(cmd *cobra.Command, args []string) error {
 	// so the deferred BLE teardown actually runs. Without this, SIGHUP
 	// (terminal close) and SIGTERM (`kill PID`) skip session.close, which
 	// leaves bluetoothd thinking the peripheral is still Connected=true
-	// for several seconds — and the next `caeruleus` invocation finds
+	// for several seconds - and the next `caeruleus` invocation finds
 	// itself talking to a stale link. SIGINT is intentionally left for
 	// readline to handle as Ctrl-C / line interrupt.
 	sigCh := make(chan os.Signal, 1)
@@ -143,7 +143,7 @@ func runShell(cmd *cobra.Command, args []string) error {
 	if showBanner() {
 		color.New(color.FgCyan).Fprint(rl.Stderr(), bannerArt)
 	}
-	color.New(color.FgHiBlack).Fprintln(rl.Stderr(), "caeruleus shell — type 'help' or 'quit'.")
+	color.New(color.FgHiBlack).Fprintln(rl.Stderr(), "caeruleus shell - type 'help' or 'quit'.")
 	for {
 		rl.SetPrompt(shellPrompt(sh.s))
 		line, err := rl.Readline()
@@ -297,12 +297,12 @@ func printShellHelp(w io.Writer) {
 
 func (sh *shell) ensureConnected() bool {
 	if sh.s.device == nil {
-		fmt.Fprintln(sh.errOut(), "no device — try: connect XX:XX:XX:XX:XX:XX")
+		fmt.Fprintln(sh.errOut(), "no device - try: connect XX:XX:XX:XX:XX:XX")
 		return false
 	}
 	connected, _ := sh.s.device.Connected()
 	if !connected {
-		fmt.Fprintln(sh.errOut(), "not connected — try: connect")
+		fmt.Fprintln(sh.errOut(), "not connected - try: connect")
 		return false
 	}
 	if sh.s.tree == nil {
@@ -337,7 +337,7 @@ func (sh *shell) cmdConnect(ctx context.Context, args []string) {
 		sh.sessMu.Unlock()
 	}
 	if sh.s.device == nil {
-		fmt.Fprintln(sh.errOut(), "no address — usage: connect XX:XX:XX:XX:XX:XX")
+		fmt.Fprintln(sh.errOut(), "no address - usage: connect XX:XX:XX:XX:XX:XX")
 		return
 	}
 	timeout := time.Duration(root.timeout) * time.Second
@@ -358,7 +358,7 @@ func (sh *shell) cmdConnect(ctx context.Context, args []string) {
 		// Route via sh.errOut() so serve-mode clients see this on the
 		// response socket; statusf would short-circuit to os.Stderr and
 		// the daemon-side terminal instead of the client.
-		fmt.Fprintf(sh.errOut(), "[+] connected in %s — %d services, %d chars, %d descs\n",
+		fmt.Fprintf(sh.errOut(), "[+] connected in %s - %d services, %d chars, %d descs\n",
 			time.Since(t0).Round(time.Millisecond), len(tree.Services), len(tree.Characteristics), len(tree.Descriptors))
 	}
 }
@@ -584,7 +584,7 @@ func (sh *shell) cmdListen(args []string) {
 				// subscribed, so the firmware-emitted notification raced past us.
 				// Point the user at the atomic alternative.
 				fmt.Fprintf(sh.errOut(),
-					"listen 0x%04x: 0 events in %ds — note that batch mode subscribes only when this line runs, so a trigger write earlier in the script may have already fired. For atomic trigger-then-listen use the standalone subcommand: `caeruleus listen -a 0x%04x --trigger-value 01`\n",
+					"listen 0x%04x: 0 events in %ds - note that batch mode subscribes only when this line runs, so a trigger write earlier in the script may have already fired. For atomic trigger-then-listen use the standalone subcommand: `caeruleus listen -a 0x%04x --trigger-value 01`\n",
 					obj.Handle, secs, obj.Handle)
 			}
 			return
@@ -612,7 +612,7 @@ func (sh *shell) cmdListen(args []string) {
 // cmdBrute writes each byte value in [start,end] to a write handle, reads a
 // response handle after every step, and prints (input, response) pairs.
 // Default: only print when the response differs from the previous iteration
-// — most fuzzes have one or two distinct responses across 256 inputs and
+// - most fuzzes have one or two distinct responses across 256 inputs and
 // dumping every iteration is noise. Append the literal token "all" as an
 // extra arg to force printing every step (e.g. `brute 0xW 0xR 0 255 all`).
 func (sh *shell) cmdBrute(args []string) {
@@ -636,10 +636,10 @@ func (sh *shell) cmdBrute(args []string) {
 	start, end := uint(0), uint(255)
 	printAll := false
 	// Trailing positional args. Accepted shapes:
-	//   brute W R                       — default range, changes-only
-	//   brute W R all                   — default range, every step
-	//   brute W R START END             — custom range, changes-only
-	//   brute W R START END all         — custom range, every step
+	//   brute W R - default range, changes-only
+	//   brute W R all - default range, every step
+	//   brute W R START END - custom range, changes-only
+	//   brute W R START END all - custom range, every step
 	rest := args[2:]
 	if len(rest) > 0 && strings.EqualFold(rest[len(rest)-1], "all") {
 		printAll = true
@@ -701,7 +701,7 @@ func (sh *shell) cmdBrute(args []string) {
 
 // cmdLoopRead reads a handle N times. It prints the iteration index every
 // time the value changes (or every iteration if --print-all is desired by
-// the caller — kept simple here), plus the final value.
+// the caller - kept simple here), plus the final value.
 func (sh *shell) cmdLoopRead(args []string) {
 	if len(args) < 2 {
 		fmt.Fprintln(sh.errOut(), "usage: loop-read 0xNNNN N")
@@ -756,7 +756,7 @@ func bytesEqual(a, b []byte) bool {
 	return true
 }
 
-// notify-on/notify-off — long-lived background subscriptions; events printed
+// notify-on/notify-off - long-lived background subscriptions; events printed
 // asynchronously above the prompt by startNotificationPump.
 func (sh *shell) cmdNotifyOn(args []string) {
 	if len(args) < 1 {
@@ -903,7 +903,7 @@ func splitFields(line string) []string {
 			cur.WriteRune(r)
 		}
 	}
-	// A trailing lone backslash emits itself rather than vanishing — most
+	// A trailing lone backslash emits itself rather than vanishing - most
 	// shells diverge here but "treat as literal" matches user expectation
 	// when typing interactively.
 	if escape {

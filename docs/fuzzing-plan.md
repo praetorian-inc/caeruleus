@@ -1,4 +1,4 @@
-# caeruleus fuzzing — plan
+# caeruleus fuzzing - plan
 
 > **Status (2026-06-01):** Phase 1a (write_req, write_cmd via BlueZ) and
 > Phase 1b (prep, exec via raw L2CAP) both landed. Phase 2 and Phase 3
@@ -12,13 +12,13 @@ crashes** (peripheral app-logic bugs) and **ATT framing-layer crashes**
 
 Explicitly out of scope: link-layer / LL frame fuzzing. That requires an
 external radio (nRF52840 + SweynTooth firmware) and is a different tool.
-caeruleus stays "rides alongside BlueZ over D-Bus + raw L2CAP" — see the
+caeruleus stays "rides alongside BlueZ over D-Bus + raw L2CAP" - see the
 README's positioning.
 
 Pentest-use target: a pentester points caeruleus at a single peripheral
 characteristic, walks away for an hour, comes back to a `crashes/` dir
 containing reproducible PoC inputs that wedged the target. Not academic
-novelty — predictable, reproducible, customer-shippable artifacts.
+novelty - predictable, reproducible, customer-shippable artifacts.
 
 ## Phasing
 
@@ -28,7 +28,7 @@ novelty — predictable, reproducible, customer-shippable artifacts.
 | 1b    | `fuzz write --include prep,exec` | ATT Prepare/Execute sequences | raw L2CAP only | second |
 | 2     | `fuzz att`   | ATT PDU framing (all opcodes) | raw L2CAP | future |
 
-Phase 1a and 1b are separate commits — 1a ships standalone and is
+Phase 1a and 1b are separate commits - 1a ships standalone and is
 immediately useful; 1b extends with multi-PDU sequences that need the raw
 L2CAP path. Phase 2 is a follow-up after we've seen the Phase 1 design
 hold up in real use.
@@ -75,11 +75,11 @@ type Harness interface {
 
 type WriteOp uint8
 const (
-    OpWriteReq      WriteOp = iota  // 0x12 — has response
-    OpWriteCmd                      // 0x52 — no response
-    OpSignedWrite                   // 0xD2 — needs CSRK; v1.1+
-    OpPrepareWrite                  // 0x16 — multi-PDU prefix
-    OpExecuteWrite                  // 0x18 — multi-PDU finalizer
+    OpWriteReq      WriteOp = iota  // 0x12 - has response
+    OpWriteCmd                      // 0x52 - no response
+    OpSignedWrite                   // 0xD2 - needs CSRK; v1.1+
+    OpPrepareWrite                  // 0x16 - multi-PDU prefix
+    OpExecuteWrite                  // 0x18 - multi-PDU finalizer
 )
 ```
 
@@ -92,7 +92,7 @@ We can't instrument the peripheral, so we approximate coverage with
 tuple = (req_opcode, resp_opcode, err_code, len_class)
 ```
 
-`len_class` is a bucket — `0, 1, 2-4, 5-16, 17-64, 65-251`. Bucketing
+`len_class` is a bucket - `0, 1, 2-4, 5-16, 17-64, 65-251`. Bucketing
 lets us treat "20 bytes back" and "23 bytes back" as the same state
 without blowing up the state set.
 
@@ -116,8 +116,7 @@ Liveness counter increments on failure; resets on success. When counter
 
 ### Reset hook
 
-Shell-only. `--target-reset "ssh root@plug ./toggle.sh && sleep 8"` —
-caeruleus calls `sh -c <cmd>`, waits for it to return, then re-runs
+Shell-only. `--target-reset "ssh root@plug ./toggle.sh && sleep 8"` - caeruleus calls `sh -c <cmd>`, waits for it to return, then re-runs
 discovery + reconnect. Pentester wraps their own curl / GPIO / serial
 toggle.
 
@@ -128,7 +127,7 @@ abort the run with a `hangs/` entry naming the last successful input.
 
 Default: read the target's current value at startup (via BlueZ
 `Characteristic.ReadValue`) and seed the corpus with it. This is the
-"natural" payload the device understands — the fastest path to
+"natural" payload the device understands - the fastest path to
 interesting mutations.
 
 Override: `--seed-file FILE` (raw bytes) or `--seed-dir DIR` (load all
@@ -138,7 +137,7 @@ Empty fallback: zero-byte seed.
 
 ### Trace format
 
-`fuzz-out-<ISO8601>/run.json` — run metadata:
+`fuzz-out-<ISO8601>/run.json` - run metadata:
 
 ```json
 {
@@ -154,14 +153,14 @@ Empty fallback: zero-byte seed.
 }
 ```
 
-`trace.jsonl` — one line per iteration:
+`trace.jsonl` - one line per iteration:
 
 ```json
 {"i":421,"mut":"havoc","seed_id":"a1b2c3","input":"01020304","op":"write_req","resp_op":"0x13","len":0,"live":true,"ms":42}
 {"i":422,"mut":"bitflip1","seed_id":"a1b2c3","input":"01020305","op":"write_req","resp_op":"0x01","err":"0x0d","live":true,"ms":38,"new_state":true}
 ```
 
-`corpus/` `queue/` `crashes/` `hangs/` — flat dirs of raw input bytes,
+`corpus/` `queue/` `crashes/` `hangs/` - flat dirs of raw input bytes,
 filename `<sha1[:16]>.bin`. Crashes get a sidecar `.json` with the
 iteration metadata for quick triage.
 
@@ -215,7 +214,7 @@ for the rationale.
   iteration to keep individual inputs cheap to triage.
 - For Phase 1b: do we run Prepare/Execute as a single "input" (one
   corpus file = N PDUs concatenated with a length prefix), or as a
-  parameterized scenario type? Current plan is the latter — easier to
+  parameterized scenario type? Current plan is the latter - easier to
   mutate piecewise.
 
 ## Prior art borrowed from

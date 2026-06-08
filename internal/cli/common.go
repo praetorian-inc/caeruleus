@@ -144,7 +144,7 @@ func parseHexBytes(s string) ([]byte, error) {
 
 // logf prints a diagnostic to stderr when --verbose is set. Prefix mirrors
 // the [*] / [+] / [-] convention shared by brutus and other Praetorian
-// CLIs — [*] means "informational, may or may not be actionable".
+// CLIs - [*] means "informational, may or may not be actionable".
 func logf(format string, args ...interface{}) {
 	if !root.verbose {
 		return
@@ -166,7 +166,7 @@ func execCommandCombined(name string, args ...string) ([]byte, error) {
 // ExitError carries a specific exit code out of a RunE function so the
 // program's main can surface it to the shell. Cobra's default error path
 // always exits 1; we use this when a subcommand wants a different code
-// (e.g. `doctor` returns 2 when one of its checks fails — the convention
+// (e.g. `doctor` returns 2 when one of its checks fails - the convention
 // among shell-friendly tools like grep / diff to distinguish "command
 // itself failed" from "command ran but found a problem").
 type ExitError struct {
@@ -185,7 +185,7 @@ func (e *ExitError) Unwrap() error { return e.Err }
 
 // confirmDisruptive prompts on a TTY for a y/N answer; returns nil to
 // proceed, an error to abort. When stdin isn't a TTY (scripts, batch
-// mode) it auto-confirms — caller scripts are assumed to want headless
+// mode) it auto-confirms - caller scripts are assumed to want headless
 // operation. Use the -y/--yes flag on a subcommand to skip even on TTY.
 func confirmDisruptive(question string) error {
 	fi, err := os.Stdin.Stat()
@@ -208,8 +208,7 @@ func confirmDisruptive(question string) error {
 
 // requireRoot returns an error before any side effect when the calling
 // process is not root (euid != 0). setcap'd binaries that don't need
-// file-write/systemctl access can use it as a pre-flight check too —
-// they'll fail here, but the alternative is partially-applied state
+// file-write/systemctl access can use it as a pre-flight check too - // they'll fail here, but the alternative is partially-applied state
 // (e.g. main.conf edited but bluetoothd restart denied) which is worse.
 // op is the subcommand or operation name used in the error message.
 func requireRoot(op string) error {
@@ -230,7 +229,7 @@ func formatIsJSON() bool {
 // and arrays follow the org convention: under `json` they emit as a
 // single indented array; under `jsonl` they emit one element per line
 // with no array wrapper. Scalars / structs emit as one object either
-// way — only the whitespace differs.
+// way - only the whitespace differs.
 func emitJSON(v interface{}) error {
 	rv := reflect.ValueOf(v)
 	if rv.Kind() == reflect.Slice || rv.Kind() == reflect.Array {
@@ -292,14 +291,14 @@ func failf(format string, args ...interface{}) {
 
 // termWidth returns the column width of the terminal on stdout, or 0 when
 // stdout is not a terminal (piped/redirected) or the size can't be read.
-// Callers use 0 to mean "don't constrain output" — piping to a file or grep
+// Callers use 0 to mean "don't constrain output" - piping to a file or grep
 // wants the full, unwrapped width.
 func termWidth() int {
 	if ws, err := unix.IoctlGetWinsize(int(os.Stdout.Fd()), unix.TIOCGWINSZ); err == nil && ws != nil && ws.Col > 0 {
 		return int(ws.Col)
 	}
 	// Not a TTY (piped/redirected): leave output unconstrained unless the
-	// caller explicitly sets COLUMNS — useful as an override and for tests.
+	// caller explicitly sets COLUMNS - useful as an override and for tests.
 	if c := os.Getenv("COLUMNS"); c != "" {
 		if n, err := strconv.Atoi(strings.TrimSpace(c)); err == nil && n > 0 {
 			return n
@@ -312,7 +311,7 @@ func termWidth() int {
 // the max duration elapses, returning nil in the former case and an
 // error wrapping the last context (when ctx is canceled) otherwise.
 // Use this instead of hand-rolled sleep-and-recheck loops for
-// "wait for X to become true" state transitions — disconnect
+// "wait for X to become true" state transitions - disconnect
 // confirmation, Powered toggle, bluetoothd-back-up after restart, etc.
 func pollUntil(ctx context.Context, pred func() bool, interval, max time.Duration) error {
 	deadline := time.Now().Add(max)

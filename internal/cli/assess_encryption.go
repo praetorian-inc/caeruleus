@@ -17,11 +17,11 @@ func newAssessEncryptionCmd() *cobra.Command {
   A. Baseline: drop any bond and read every readable characteristic over an
      unauthenticated link, recording which succeed vs require authentication.
   B. Pairing: attempt to pair. If the peripheral refuses pairing, it has no
-     way to enforce link encryption — everything readable in A is permanently
+     way to enforce link encryption - everything readable in A is permanently
      exposed (reported here).
   C. Enforcement / fallback: if pairing succeeded, re-read the characteristics
      that required auth (they should now succeed = enforcement), then unpair
-     and re-read them — anything still readable is a legacy-fallback weakness.`,
+     and re-read them - anything still readable is a legacy-fallback weakness.`,
 		RunE: runAssessEncryption,
 	}
 }
@@ -66,7 +66,7 @@ func runAssessEncryption(cmd *cobra.Command, args []string) error {
 			detail = pa.pairErr.Error()
 		}
 		res.Findings = append(res.Findings, Finding{
-			Title:    "No pairing support — link encryption cannot be enforced",
+			Title:    "No pairing support - link encryption cannot be enforced",
 			Severity: SevMedium,
 			Detail:   "Device1.Pair did not succeed: " + detail + ". Any readable characteristic is exposed over a plaintext link with no path to encryption.",
 		})
@@ -98,7 +98,7 @@ func runAssessEncryption(cmd *cobra.Command, args []string) error {
 					Severity: SevInfo,
 					Handle:   h,
 					UUID:     uuidByHandle[h],
-					Detail:   "Characteristic required authentication unpaired and succeeded once bonded — correct enforcement.",
+					Detail:   "Characteristic required authentication unpaired and succeeded once bonded - correct enforcement.",
 				})
 			}
 		}

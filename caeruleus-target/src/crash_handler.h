@@ -1,5 +1,5 @@
 /**
- * crash_handler.h — Crash handler and watchdog recovery
+ * crash_handler.h - Crash handler and watchdog recovery
  *
  * Captures HardFault crash info to retained RAM (.noinit section) so it
  * survives reset.  On next boot, crash_handler_init() detects the magic
@@ -21,7 +21,7 @@ extern "C" {
 #endif
 
 /* -------------------------------------------------------------------------
- * Crash info — retained across resets in .noinit RAM
+ * Crash info - retained across resets in .noinit RAM
  * ------------------------------------------------------------------------- */
 
 /**

@@ -3,15 +3,15 @@
 //
 // The interactive shell uses chzyer/readline which refuses to function
 // when stdin isn't a TTY, so piping stdin (as `batch` does) bypasses the
-// most interesting parts of the shell — the prompt rendering, the
+// most interesting parts of the shell - the prompt rendering, the
 // notification pump that prints above the prompt, history file handling,
 // and the keystroke-level dispatch. This harness allocates a pty so the
 // shell sees a "real" terminal and we can drive it programmatically.
 //
 // Usage:
 //
-//	go run ./cmd/shell-harness                # smoke tests only
-//	go run ./cmd/shell-harness --addr XX:..   # smoke + device tests
+//	go run ./cmd/shell-harness                # tests with no peripheral
+//	go run ./cmd/shell-harness --addr XX:..   # tests including the device-touching ones
 //	go run ./cmd/shell-harness --bin /path/to/caeruleus
 //
 // Exit code: 0 if every test passed, 1 otherwise.
@@ -35,7 +35,7 @@ import (
 
 var (
 	flagBinary  = flag.String("bin", "./caeruleus", "path to the caeruleus binary under test")
-	flagAddr    = flag.String("addr", "", "BD_ADDR to use for the device-touching tests; smoke tests run regardless")
+	flagAddr    = flag.String("addr", "", "BD_ADDR to use for the device-touching tests; the no-peripheral tests run regardless")
 	flagTimeout = flag.Duration("timeout", 12*time.Second, "per-step regex-match timeout")
 	flagKeep    = flag.Bool("keep-running", false, "print one PASS/FAIL line per check rather than abort on first FAIL")
 )
@@ -112,7 +112,7 @@ func (s *shellSession) reset() {
 	s.mu.Unlock()
 }
 
-// close attempts a graceful shutdown — sends "quit" and waits up to 3s
+// close attempts a graceful shutdown - sends "quit" and waits up to 3s
 // for the child's deferred cleanup to run (including session.close which
 // waits for BlueZ Connected=false). Falls back to Kill on timeout so the
 // harness never hangs on a wedged child.
@@ -167,7 +167,7 @@ func (tc tcase) execute() (ok bool, msg string) {
 
 // promptRe matches the `]> ` suffix of the shell prompt. We don't anchor
 // at end-of-string because readline emits trailing terminal control bytes
-// (cursor reposition, attribute reset) after the visible prompt — those
+// (cursor reposition, attribute reset) after the visible prompt - those
 // are fine to ignore. The literal `]> ` is unique to the prompt and won't
 // false-match in any command output we care about.
 var promptRe = regexp.MustCompile(`\]> `)
@@ -198,7 +198,7 @@ func step(s *shellSession, line, expectPat string) error {
 
 // --- tests ---------------------------------------------------------------
 
-func smokeTests() []tcase {
+func coreTests() []tcase {
 	return []tcase{
 		{
 			name: "banner appears",
@@ -348,7 +348,7 @@ func deviceTests(addr string) []tcase {
 		},
 		{
 			// Without the SIGTERM/SIGHUP handler installed in shell.go,
-			// `kill -TERM` is the OS default — it terminates the process
+			// `kill -TERM` is the OS default - it terminates the process
 			// directly, skipping the deferred BLE cleanup. With the
 			// handler, rl.Close() makes Readline return io.EOF, the main
 			// loop returns nil, defers run (session.close waits up to 2s
@@ -381,7 +381,7 @@ func deviceTests(addr string) []tcase {
 					if exitErr, ok := err.(*exec.ExitError); ok {
 						if ws, ok := exitErr.Sys().(syscall.WaitStatus); ok && ws.Signaled() {
 							return fmt.Errorf(
-								"process terminated by signal %v rather than exiting cleanly — signal handler did not run",
+								"process terminated by signal %v rather than exiting cleanly - signal handler did not run",
 								ws.Signal())
 						}
 					}
@@ -399,7 +399,7 @@ func deviceTests(addr string) []tcase {
 			// test the redraw fidelity, but we *can* verify that an event
 			// triggered after notify-on actually surfaces in the terminal.
 			//
-			// Uses 0x0043 (the BLECTF multi-notify char) — writing to it
+			// Uses 0x0043 (the BLECTF multi-notify char) - writing to it
 			// triggers the firmware to start emitting. The "[notify ...]"
 			// marker is unique to the pump's print path.
 			name: "notify-on surfaces async events",
@@ -426,7 +426,7 @@ func deviceTests(addr string) []tcase {
 					return err
 				}
 				// Wait for the pump's async print marker. 8s window is
-				// generous — multi-notify usually fires within ~100ms.
+				// generous - multi-notify usually fires within ~100ms.
 				if _, err := s.waitFor(regexp.MustCompile(`\[notify 0x0043\]`), 8*time.Second); err != nil {
 					return err
 				}
@@ -442,7 +442,7 @@ func deviceTests(addr string) []tcase {
 	}
 }
 
-// historyTests verify side-effect outputs of the shell — history file
+// historyTests verify side-effect outputs of the shell - history file
 // writes, etc. They don't need a peripheral.
 func historyTests() []tcase {
 	return []tcase{
@@ -510,7 +510,7 @@ func main() {
 		os.Exit(2)
 	}
 
-	cases := smokeTests()
+	cases := coreTests()
 	cases = append(cases, historyTests()...)
 	if *flagAddr != "" {
 		cases = append(cases, deviceTests(*flagAddr)...)

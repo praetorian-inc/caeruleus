@@ -1,5 +1,5 @@
 /**
- * crash_handler.c — Crash handler and watchdog recovery
+ * crash_handler.c - Crash handler and watchdog recovery
  *
  * HardFault_Handler is a naked function that extracts the Cortex-M4
  * exception frame from the correct stack pointer (MSP or PSP), writes
@@ -26,7 +26,7 @@
 #include "nrf_log_ctrl.h"
 
 /* =========================================================================
- * Retained RAM — survives reset (placed in .noinit section)
+ * Retained RAM - survives reset (placed in .noinit section)
  * ========================================================================= */
 
 /**
@@ -37,7 +37,7 @@
 static crash_info_t m_crash_info __attribute__((section(".noinit")));
 
 /* =========================================================================
- * HardFault_Handler — naked, no prologue/epilogue
+ * HardFault_Handler - naked, no prologue/epilogue
  * ========================================================================= */
 
 /**
@@ -92,7 +92,7 @@ void __attribute__((naked)) HardFault_Handler(void)
 }
 
 /* =========================================================================
- * crash_handler_init — call early in main()
+ * crash_handler_init - call early in main()
  * ========================================================================= */
 
 void crash_handler_init(void)
@@ -142,12 +142,12 @@ crash_info_t const *crash_handler_get_info(void)
 static nrf_drv_wdt_channel_id m_wdt_channel;
 
 /**
- * WDT interrupt callback — fires just before the WDT forces a reset.
+ * WDT interrupt callback - fires just before the WDT forces a reset.
  * We have roughly two 32 kHz clock cycles (~60 us) to execute here.
  */
 static void wdt_event_handler(void)
 {
-    NRF_LOG_ERROR("WDT: timeout — system will reset");
+    NRF_LOG_ERROR("WDT: timeout - system will reset");
     /* NOTE: NRF_LOG_FLUSH() is intentionally omitted here.  The WDT
      * interrupt fires at the highest priority and the reset is
      * imminent; attempting a blocking flush could itself hang.  The

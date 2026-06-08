@@ -20,9 +20,8 @@ var cccdFlags struct {
 }
 
 // cccdUUID is the Client Characteristic Configuration Descriptor UUID
-// (0x2902 in the 128-bit form). Unused by the current Layer A path —
-// BlueZ hides CCCDs from D-Bus and we drive subscription via StartNotify
-// — but kept named (vs a magic string in a future PR) for the Layer B
+// (0x2902 in the 128-bit form). Unused by the current Layer A path - // BlueZ hides CCCDs from D-Bus and we drive subscription via StartNotify
+// - but kept named (vs a magic string in a future PR) for the Layer B
 // raw-L2CAP descriptor walk that will need it.
 //
 //nolint:unused // reserved for the M4 raw-L2CAP path
@@ -46,9 +45,9 @@ func newCCCDWriteCmd() *cobra.Command {
 (Layer B, --raw).
 
 Layer A works only when BlueZ has actually discovered the CCCD as a
-descriptor object — typically when the characteristic advertises NOTIFY
+descriptor object - typically when the characteristic advertises NOTIFY
 or INDICATE. For chars that don't advertise either (the "hidden notify"
-class — a CCCD exists on the wire but the char's properties don't
+class - a CCCD exists on the wire but the char's properties don't
 declare it), BlueZ silently omits the CCCD from its object tree and
 Layer A returns a clear error.
 
@@ -75,7 +74,7 @@ Selecting the target:
 	c.Flags().StringVar(&cccdFlags.handle, "handle", "", "explicit descriptor handle to write to (skips auto-discovery)")
 	c.Flags().StringVar(&cccdFlags.enable, "enable", "", "notify | indicate | off")
 	c.Flags().StringVar(&cccdFlags.value, "value", "", "explicit 2-byte hex value (overrides --enable)")
-	c.Flags().BoolVar(&cccdFlags.raw, "raw", false, "use raw L2CAP ATT path (Layer B — requires root and --handle)")
+	c.Flags().BoolVar(&cccdFlags.raw, "raw", false, "use raw L2CAP ATT path (Layer B - requires root and --handle)")
 	return c
 }
 
@@ -171,7 +170,7 @@ func runCCCDWrite(cmd *cobra.Command, args []string) error {
 		// 0100 = notify, 0200 = indicate, both → StartNotify; BlueZ picks
 		// the right CCCD value based on the char's advertised Flags.
 		if err := c.StartNotify(); err != nil {
-			return fmt.Errorf("StartNotify 0x%04x: %w (char must advertise notify or indicate for Layer A — use --raw for chars without)", char.Handle, err)
+			return fmt.Errorf("StartNotify 0x%04x: %w (char must advertise notify or indicate for Layer A - use --raw for chars without)", char.Handle, err)
 		}
 	}
 	fmt.Printf("0x%04x %s=ok (CCCD effectively %02x%02x via BlueZ)\n", char.Handle, intent, payload[0], payload[1])
@@ -185,7 +184,7 @@ func runCCCDWrite(cmd *cobra.Command, args []string) error {
 // class of CCCDs that BlueZ doesn't expose via D-Bus.
 //
 // Requires root (CAP_NET_RAW for the socket). The peripheral must be
-// reachable; we don't bring up an LE connection ourselves — BlueZ's
+// reachable; we don't bring up an LE connection ourselves - BlueZ's
 // existing link (if any) carries the ATT traffic, and the kernel
 // routes our PDUs onto that link.
 //
@@ -193,7 +192,7 @@ func runCCCDWrite(cmd *cobra.Command, args []string) error {
 // whole point of --raw is to reach handles BlueZ hides).
 func runCCCDWriteRaw(payload []byte) error {
 	if cccdFlags.handle == "" {
-		return fmt.Errorf("cccd write --raw requires --handle (the descriptor handle to write — use this when BlueZ hides the CCCD from D-Bus because the char doesn't advertise notify/indicate)")
+		return fmt.Errorf("cccd write --raw requires --handle (the descriptor handle to write - use this when BlueZ hides the CCCD from D-Bus because the char doesn't advertise notify/indicate)")
 	}
 	handle, err := parseHandle(cccdFlags.handle)
 	if err != nil {

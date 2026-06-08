@@ -2,7 +2,7 @@ package cli
 
 import "github.com/spf13/cobra"
 
-// newFuzzCmd assembles `caeruleus fuzz` — the parent for all fuzzing
+// newFuzzCmd assembles `caeruleus fuzz` - the parent for all fuzzing
 // subcommands. The work lives in the subcommands; this just hangs them
 // off a common prefix so help text groups them together.
 func newFuzzCmd() *cobra.Command {

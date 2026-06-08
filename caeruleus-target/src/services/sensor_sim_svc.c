@@ -1,5 +1,5 @@
 /**
- * sensor_sim_svc.c — Sensor Simulation Service implementation
+ * sensor_sim_svc.c - Sensor Simulation Service implementation
  *
  * Deliberately vulnerable BLE service for Caeruleus security testing.
  * All characteristics use open permissions with no encryption requirement.
@@ -331,7 +331,7 @@ static uint32_t sensor_char_add(ble_sensor_sim_svc_t     * p_svc,
 }
 
 /**
- * Handle BLE_GAP_EVT_CONNECTED — store connection handle.
+ * Handle BLE_GAP_EVT_CONNECTED - store connection handle.
  */
 static void on_connect(ble_sensor_sim_svc_t * p_svc, ble_evt_t const * p_ble_evt)
 {
@@ -340,7 +340,7 @@ static void on_connect(ble_sensor_sim_svc_t * p_svc, ble_evt_t const * p_ble_evt
 }
 
 /**
- * Handle BLE_GAP_EVT_DISCONNECTED — clear connection handle and CCCD state.
+ * Handle BLE_GAP_EVT_DISCONNECTED - clear connection handle and CCCD state.
  */
 static void on_disconnect(ble_sensor_sim_svc_t * p_svc, ble_evt_t const * p_ble_evt)
 {
@@ -355,9 +355,9 @@ static void on_disconnect(ble_sensor_sim_svc_t * p_svc, ble_evt_t const * p_ble_
 }
 
 /**
- * Handle BLE_GATTS_EVT_WRITE — detect CCCD writes and update notification flags.
+ * Handle BLE_GATTS_EVT_WRITE - detect CCCD writes and update notification flags.
  *
- * VULNERABILITY: No authentication check — any connected peer can enable
+ * VULNERABILITY: No authentication check - any connected peer can enable
  * notifications without pairing or encryption.
  */
 static void on_write(ble_sensor_sim_svc_t * p_svc, ble_evt_t const * p_ble_evt)

@@ -38,8 +38,7 @@ func newConnParamsCmd() *cobra.Command {
 		Use:     "conn-params",
 		Aliases: []string{"connparams", "cparams"},
 		Short:   "Report the negotiated connection parameters for -b BDADDR (needs root)",
-		Long: `Recovers the LE connection parameters BlueZ does not expose over D-Bus —
-connection interval, peripheral latency, and supervision timeout — plus the
+		Long: `Recovers the LE connection parameters BlueZ does not expose over D-Bus - connection interval, peripheral latency, and supervision timeout - plus the
 negotiated ATT MTU.
 
 How it works: the local link is dropped if up, then re-established while a

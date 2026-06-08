@@ -29,10 +29,10 @@ func newAssessDFUCmd() *cobra.Command {
 		Short: "Detect a DFU service on -b BDADDR and whether entry is unauthenticated",
 		Long: `Detects a Nordic-style Device Firmware Update service (0xFE59) and reports
 its control / buttonless-entry characteristics and whether they are writable
-over an unauthenticated link — an unauthenticated buttonless-DFU entry point
+over an unauthenticated link - an unauthenticated buttonless-DFU entry point
 lets an attacker reboot the device into its bootloader.
 
-Detection only by default — it never writes a DFU opcode, because triggering
+Detection only by default - it never writes a DFU opcode, because triggering
 buttonless DFU reboots the target into its bootloader. --probe-entry opts in
 to actually writing the enter-bootloader opcode (DESTRUCTIVE: reboots the
 device); it prompts on a TTY unless -y is given.`,

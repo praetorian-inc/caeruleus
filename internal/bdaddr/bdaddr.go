@@ -263,7 +263,7 @@ func SetAddress(idx uint16, vendor string, addr [6]byte) error {
 
 // ResetAdapter issues an HCIDEVRESET ioctl on hciN. This is the only way
 // known to make bluetoothd re-read the BD_ADDR after a vendor-specific
-// write that mutates the controller's volatile address state — a soft
+// write that mutates the controller's volatile address state - a soft
 // Adapter1.Powered=false → true cycle re-loads from OTP on Intel chips,
 // undoing the spoof. The ioctl on its own can leave the controller in
 // BR/EDR INQUIRY mode, which silently blocks LE advertisement reception
@@ -275,7 +275,7 @@ func ResetAdapter(idx uint16) error {
 		return err
 	}
 	defer unix.Close(fd)
-	const HCIDEVRESET = 0x400448cb // _IOW('H', 203, int) — kernel <bluetooth/hci.h>
+	const HCIDEVRESET = 0x400448cb // _IOW('H', 203, int) - kernel <bluetooth/hci.h>
 	if _, _, e := unix.Syscall(unix.SYS_IOCTL, uintptr(fd), uintptr(HCIDEVRESET), uintptr(idx)); e != 0 {
 		return fmt.Errorf("HCIDEVRESET: %w", e)
 	}

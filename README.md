@@ -1,8 +1,8 @@
 # Caeruleus
 
-Caeruleus is a hardware-agnostic BLE security testing toolkit for Linux/BlueZ, implemented as a single Go binary (`caeruleus`). It covers the full interaction-to-assessment lifecycle — scan, enumerate, read/write/notify, fuzzing, and structured security assessment — talking to peripherals directly over BlueZ D-Bus and raw L2CAP/HCI sockets. A portable [Agent Skill](https://agentskills.io) (`skills/caeruleus/`) orchestrates the binary's `-o json` output into assessment workflows and reports, and works with any Agent Skills-compatible agent.
+Caeruleus is a hardware-agnostic BLE security testing toolkit for Linux/BlueZ, implemented as a single Go binary (`caeruleus`). It covers the full interaction-to-assessment lifecycle - scan, enumerate, read/write/notify, fuzzing, and structured security assessment - talking to peripherals directly over BlueZ D-Bus and raw L2CAP/HCI sockets. A portable [Agent Skill](https://agentskills.io) (`skills/caeruleus/`) orchestrates the binary's `-o json` output into assessment workflows and reports, and works with any Agent Skills-compatible agent.
 
-*caeruleus* — Latin for "blue"
+*caeruleus* - Latin for "blue"
 
 > The earlier proof-of-concept (a TypeScript + persistent-Python-server skill) has been superseded by this Go implementation. It remains recoverable in git history.
 
@@ -14,8 +14,8 @@ AI agent (Agent Skills)  ──drives──►  caeruleus skill (skills/caeruleu
                                       ▼
                          caeruleus (Go binary, this repo)
                           ├─ BlueZ D-Bus  (Adapter1/Device1/GattCharacteristic1)
-                          ├─ raw L2CAP ATT socket (CID 0x0004)   — root
-                          └─ HCI monitor socket (btmon channel)  — root
+                          ├─ raw L2CAP ATT socket (CID 0x0004) - root
+                          └─ HCI monitor socket (btmon channel) - root
 ```
 
 No Python, no MCP server, no sniffer/relay hardware, and no shelling out to other tools.
@@ -25,7 +25,7 @@ No Python, no MCP server, no sniffer/relay hardware, and no shelling out to othe
 ```
 caeruleus/
 ├── cmd/caeruleus/        # main entrypoint (binary: caeruleus)
-├── cmd/shell-harness/    # pty-driven smoke tester for the interactive shell
+├── cmd/shell-harness/    # pty-driven tester for the interactive shell
 ├── internal/
 │   ├── cli/              # cobra command tree (one file per command group)
 │   ├── bluez/            # hand-rolled BlueZ D-Bus wrapper
@@ -42,7 +42,7 @@ caeruleus/
 
 ```bash
 make build        # -> ./caeruleus
-make test         # unit tests + shell smoke tests
+make test         # unit tests + shell tests
 ```
 
 ## Command groups

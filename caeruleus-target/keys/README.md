@@ -27,7 +27,7 @@ nrfutil pkg generate --application app.hex \
   --application-version 2 --hw-version 52 \
   --sd-req 0x0100 --key-file private.pem signed_dfu.zip
 
-# Downgrade (version 0 — accepted due to no rollback protection)
+# Downgrade (version 0 - accepted due to no rollback protection)
 nrfutil pkg generate --application app.hex \
   --application-version 0 --hw-version 52 \
   --sd-req 0x0100 --no-key downgrade_dfu.zip

@@ -12193,7 +12193,7 @@
 #define HARDWARE_REVISION               "nRF52840 DK"
 #endif
 
-/* --- Connection parameters — deliberately weak --- */
+/* --- Connection parameters - deliberately weak --- */
 #undef MIN_CONN_INTERVAL
 #undef MAX_CONN_INTERVAL
 #undef SLAVE_LATENCY
@@ -12203,7 +12203,7 @@
 #define SLAVE_LATENCY                   10
 #define CONN_SUP_TIMEOUT                MSEC_TO_UNITS(20000, UNIT_10_MS)
 
-/* --- Advertising — 100ms, never stop --- */
+/* --- Advertising - 100ms, never stop --- */
 #undef APP_ADV_INTERVAL
 #undef APP_ADV_DURATION
 #define APP_ADV_INTERVAL                MSEC_TO_UNITS(100, UNIT_0_625_MS)
@@ -12214,7 +12214,7 @@
 #define APP_COMPANY_IDENTIFIER          0x0059
 #endif
 
-/* --- Security — deliberately weak (Just Works, no MITM) --- */
+/* --- Security - deliberately weak (Just Works, no MITM) --- */
 #undef SEC_PARAM_BOND
 #undef SEC_PARAM_MITM
 #undef SEC_PARAM_LESC
@@ -12256,7 +12256,7 @@
 #define WDT_TIMEOUT_MS                  2000
 #define CRASH_INFO_MAGIC                0xDEADBEEF
 
-/* --- DFU — deliberately insecure --- */
+/* --- DFU - deliberately insecure --- */
 #ifndef BLE_DFU_ENABLED
 #define BLE_DFU_ENABLED 1
 #endif

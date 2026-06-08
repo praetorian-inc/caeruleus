@@ -22,7 +22,7 @@ type Record struct {
 	Input    string `json:"input"` // hex
 	Op       string `json:"op"`    // write_req | write_cmd | prep | exec | ...
 
-	// Response fields — all optional.
+	// Response fields - all optional.
 	RespOp  string `json:"resp_op,omitempty"`
 	ErrCode string `json:"err,omitempty"`
 	RespLen int    `json:"resp_len,omitempty"`
@@ -105,7 +105,7 @@ func (it *Iterator) Next() (Record, error) {
 		return Record{}, jerr
 	}
 	if err == io.EOF {
-		// Last line without trailing newline — return it, signal EOF next call.
+		// Last line without trailing newline - return it, signal EOF next call.
 		return rec, nil
 	}
 	return rec, nil

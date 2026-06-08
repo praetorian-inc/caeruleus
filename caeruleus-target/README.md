@@ -73,12 +73,12 @@ nrfjprog --reset -f nrf52
 ### DFU Package Creation
 
 ```bash
-# Unsigned package (accepted — vulnerability)
+# Unsigned package (accepted - vulnerability)
 nrfutil pkg generate --application app.hex \
   --application-version 2 --hw-version 52 \
   --sd-req 0x0100 --no-key unsigned_dfu.zip
 
-# Downgrade package (version 0 — accepted due to no rollback protection)
+# Downgrade package (version 0 - accepted due to no rollback protection)
 nrfutil pkg generate --application app.hex \
   --application-version 0 --hw-version 52 \
   --sd-req 0x0100 --no-key downgrade_dfu.zip
@@ -121,9 +121,9 @@ caeruleus-target/
 │   ├── main.c                    # BLE init, GATT services, event handlers
 │   ├── crash_handler.c/.h        # HardFault handler + WDT recovery
 │   └── services/
-│       ├── vuln_data_svc.c/.h    # Vulnerable Data (0xBEEF) — 4 chars
-│       ├── cmd_ctrl_svc.c/.h     # Command & Control (0xC0DE) — 3 chars
-│       └── sensor_sim_svc.c/.h   # Sensor Simulation (0x5E45) — 3 chars
+│       ├── vuln_data_svc.c/.h    # Vulnerable Data (0xBEEF) - 4 chars
+│       ├── cmd_ctrl_svc.c/.h     # Command & Control (0xC0DE) - 3 chars
+│       └── sensor_sim_svc.c/.h   # Sensor Simulation (0x5E45) - 3 chars
 ├── dfu/
 │   └── bootloader/
 │       ├── main.c                # DFU bootloader (unsigned mode)

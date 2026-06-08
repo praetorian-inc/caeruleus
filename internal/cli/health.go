@@ -14,7 +14,7 @@ import (
 // errLEScanWedged is returned by verifyLEHealthy when an active discovery
 // produces zero events in the given window. It carries a fix hint suitable
 // for direct display to the user.
-var errLEScanWedged = errors.New("LE scan appears wedged — try `caeruleus adapter power cycle`")
+var errLEScanWedged = errors.New("LE scan appears wedged - try `caeruleus adapter power cycle`")
 
 // verifyLEHealthy probes whether the LE side of the controller is
 // currently delivering advertisements. It starts a short discovery and
@@ -22,7 +22,7 @@ var errLEScanWedged = errors.New("LE scan appears wedged — try `caeruleus adap
 // timing out after window.
 //
 // Returns nil if at least one event arrived. Returns errLEScanWedged if
-// no events arrived — most likely a post-HCIDEVRESET stuck state. Other
+// no events arrived - most likely a post-HCIDEVRESET stuck state. Other
 // errors mean we couldn't even start the probe (no bus, no adapter,
 // discovery already-in-progress on a conflicting filter, etc.).
 //
@@ -60,7 +60,7 @@ func verifyLEHealthy(ctx context.Context, window time.Duration) error {
 	}
 
 	if err := conn.StartDiscovery(); err != nil {
-		// Discovery already in progress is fine — we'll piggy-back on it.
+		// Discovery already in progress is fine - we'll piggy-back on it.
 		s := err.Error()
 		if !contains(s, "AlreadyExists") && !contains(s, "InProgress") {
 			return fmt.Errorf("health probe: StartDiscovery: %w", err)
@@ -81,7 +81,7 @@ func verifyLEHealthy(ctx context.Context, window time.Duration) error {
 			if !ok {
 				continue
 			}
-			// Any RSSI update from a device path counts — that's a fresh
+			// Any RSSI update from a device path counts - that's a fresh
 			// advert decoded by the LE radio.
 			if ev.Interface != bluez.IfaceDevice {
 				continue

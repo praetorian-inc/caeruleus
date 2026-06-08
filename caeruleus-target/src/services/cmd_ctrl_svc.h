@@ -1,12 +1,12 @@
 /**
- * cmd_ctrl_svc.h — Command & Control Service (0xC0DE)
+ * cmd_ctrl_svc.h - Command & Control Service (0xC0DE)
  *
  * Deliberately vulnerable BLE service for security testing.
  *
  * Vulnerabilities:
- *   - Command Input:    No sequence number / nonce — replay-vulnerable
+ *   - Command Input:    No sequence number / nonce - replay-vulnerable
  *   - Command Response: Buffer overflow on writes >244 bytes → HardFault
- *   - Admin Control:    Auth bypass — accessible without pairing
+ *   - Admin Control:    Auth bypass - accessible without pairing
  *
  * Service UUID:  C0DE???? -7890-ABCD-EF01-223344556677  (base)
  *                         short = 0xC0DE
@@ -29,7 +29,7 @@ extern "C" {
 #endif
 
 /* --------------------------------------------------------------------------
- * Observer priority — register with the SoftDevice BLE event dispatcher
+ * Observer priority - register with the SoftDevice BLE event dispatcher
  * -------------------------------------------------------------------------- */
 #define BLE_CMD_CTRL_SVC_BLE_OBSERVER_PRIO  2
 
@@ -51,7 +51,7 @@ typedef struct ble_cmd_ctrl_svc_s ble_cmd_ctrl_svc_t;
  * Characteristic buffer sizes
  * -------------------------------------------------------------------------- */
 #define CMD_INPUT_MAX_LEN       244     /**< Max command input length.        */
-#define CMD_RESPONSE_BUF_LEN    244     /**< Fixed response buffer — overflow
+#define CMD_RESPONSE_BUF_LEN    244     /**< Fixed response buffer - overflow
                                              target when write exceeds this.  */
 #define ADMIN_CTRL_LEN          1       /**< Single admin-state byte.         */
 
@@ -88,7 +88,7 @@ struct ble_cmd_ctrl_svc_s
 uint32_t ble_cmd_ctrl_svc_init(ble_cmd_ctrl_svc_t * p_svc);
 
 /**
- * @brief BLE event handler — forward SoftDevice events to this service.
+ * @brief BLE event handler - forward SoftDevice events to this service.
  *
  * Must be called from the BLE event dispatcher (registered via
  * NRF_SDH_BLE_OBSERVER).  Handles connect, disconnect, and GATTS write

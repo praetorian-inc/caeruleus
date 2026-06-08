@@ -1,5 +1,5 @@
 /* Minimal BLE advertising test for Makerdiary nRF52840 dongle.
- * No services, no peer manager — just SoftDevice init + advertising.
+ * No services, no peer manager - just SoftDevice init + advertising.
  */
 
 #include <stdint.h>

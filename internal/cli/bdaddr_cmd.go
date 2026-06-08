@@ -30,12 +30,12 @@ manufacturer via BlueZ's Management API.
 
 With --set XX:XX:XX:XX:XX:XX it issues the vendor-specific HCI write command
 matching the controller manufacturer, then performs an Adapter1.Powered cycle
-so the kernel re-reads BD_ADDR from the chip — without this the kernel keeps
+so the kernel re-reads BD_ADDR from the chip - without this the kernel keeps
 returning the OEM address from the in-memory cache populated at last HCI_UP
 and the post-write verification is meaningless. The soft cycle preserves the
 volatile BD_ADDR on common chips (Intel, Broadcom), so the spoof survives.
 
-Workflows (try in order — stop at the first that sticks):
+Workflows (try in order - stop at the first that sticks):
 
   bdaddr --set XX                  # DEFAULT. Vendor write + soft Adapter1.Powered
                                      cycle to refresh the kernel/bluetoothd cache.
@@ -59,9 +59,9 @@ silently fail. Try anyway, but report a clear status.`,
 	}
 	c.Flags().BoolVar(&bdaddrFlags.show, "show", false, "read and print the current adapter BD_ADDR + manufacturer")
 	c.Flags().StringVar(&bdaddrFlags.set, "set", "", "rewrite the adapter BD_ADDR to this MAC")
-	c.Flags().BoolVar(&bdaddrFlags.transient, "transient", false, "do not persist the change (informational only — kernel decides)")
+	c.Flags().BoolVar(&bdaddrFlags.transient, "transient", false, "do not persist the change (informational only - kernel decides)")
 	c.Flags().BoolVar(&bdaddrFlags.refreshBluez, "refresh-bluez", false,
-		"LAST RESORT only — use plain --set first. Runs HCIDEVRESET after the vendor write; on some chips (notably Intel AX) this also reloads OTP and silently reverts the spoof, and can leave the controller stuck in BR/EDR INQUIRY mode. Reach for this only when plain --set leaves bluetoothd reporting the old addr.")
+		"LAST RESORT only - use plain --set first. Runs HCIDEVRESET after the vendor write; on some chips (notably Intel AX) this also reloads OTP and silently reverts the spoof, and can leave the controller stuck in BR/EDR INQUIRY mode. Reach for this only when plain --set leaves bluetoothd reporting the old addr.")
 	// Backward-compat: --no-apply was the previous-default-disabler; the
 	// behaviour it produced is now the default, so the flag is a no-op.
 	c.Flags().BoolVar(&bdaddrFlags.noReset, "no-apply", false, "no-op; the apply step is off by default now")
@@ -122,7 +122,7 @@ func runBdaddr(cmd *cobra.Command, args []string) error {
 		vendor = bdaddr.VendorForManufacturer(info.Manufacturer)
 	}
 	if vendor == "" {
-		return fmt.Errorf("no known vendor command for manufacturer %d — pass --vendor to force one", info.Manufacturer)
+		return fmt.Errorf("no known vendor command for manufacturer %d - pass --vendor to force one", info.Manufacturer)
 	}
 
 	logf("issuing vendor=%s write of %s on hci%d", vendor, bdaddrFlags.set, idx)
@@ -149,12 +149,12 @@ func runBdaddr(cmd *cobra.Command, args []string) error {
 		// Soft refresh path. The kernel populates hdev->bdaddr from the
 		// chip during HCI_UP and never re-reads it afterwards, so both
 		// MGMT_OP_READ_INFO and HCIGETDEVINFO return the OEM value right
-		// after a successful vendor write — making a chip-live readback
+		// after a successful vendor write - making a chip-live readback
 		// impossible without a power cycle. Adapter1.Powered=false→true
 		// flushes that cache; on Intel/Broadcom/etc. the firmware
 		// retains volatile BD_ADDR across this soft cycle, so the spoof
 		// survives. (HCIDEVRESET would also re-init but reloads OTP on
-		// Intel and reverts the spoof — that's the --refresh-bluez path.)
+		// Intel and reverts the spoof - that's the --refresh-bluez path.)
 		if err := drainConnectedPeripherals(); err != nil {
 			failf("could not drain peripherals before power cycle: %v", err)
 		}
@@ -170,9 +170,9 @@ func runBdaddr(cmd *cobra.Command, args []string) error {
 	if err == nil {
 		fmt.Printf("post-write addr: %s (wanted %s)\n", info2.Address, bdaddrFlags.set)
 		if strings.EqualFold(info2.Address, bdaddrFlags.set) {
-			fmt.Println("OK — adapter accepted the new address")
+			fmt.Println("OK - adapter accepted the new address")
 		} else {
-			fmt.Println("WARNING — adapter rejected or ignored the vendor write (read-back differs)")
+			fmt.Println("WARNING - adapter rejected or ignored the vendor write (read-back differs)")
 		}
 	}
 	return nil

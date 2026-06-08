@@ -25,7 +25,7 @@ func newEnumerateCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:     "enumerate",
 		Aliases: []string{"enum"},
-		Short:   "Connect to a device and print its full GATT tree as a table",
+		Short:   "Print a device's full GATT tree as a table (--values also reads each characteristic)",
 		RunE:    runEnumerate,
 	}
 	c.Flags().BoolVar(&enumerateFlags.readValues, "values", false, "read each readable characteristic and include its value (slow; opt in only)")
@@ -100,7 +100,7 @@ func runEnumerate(cmd *cobra.Command, args []string) error {
 	t.AppendHeader(table.Row{"SVC HND", "CHR HND", "CHR UUID", "PROPS", "HEX", "ASCII"})
 
 	// On a real terminal, bound the wide columns so the rendered box never
-	// exceeds the terminal width — otherwise the terminal hard-wraps each line
+	// exceeds the terminal width - otherwise the terminal hard-wraps each line
 	// and the box borders shatter. Piped/redirected output (width 0) is left
 	// unconstrained so files and grep get full, single-line values.
 	if w := termWidth(); w > 0 {
@@ -251,8 +251,7 @@ func formatProps(flags []string) string {
 }
 
 // shortUUID renders adopted (SIG-base) 128-bit UUIDs in their compact 0xXXXX
-// form for display; custom/vendor UUIDs are returned unchanged. Display-only —
-// the JSON output keeps the full canonical UUID.
+// form for display; custom/vendor UUIDs are returned unchanged. Display-only - // the JSON output keeps the full canonical UUID.
 func shortUUID(u string) string {
 	if len(u) >= 8 && isSIGBaseUUID(u) {
 		return "0x" + strings.ToUpper(u[4:8])

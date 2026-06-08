@@ -13,7 +13,7 @@
 //	  trace.jsonl
 //
 // Filenames are sha1(input)[:16].bin. A sidecar .json with the same stem
-// holds per-input metadata (iteration, response opcode, etc.) — useful
+// holds per-input metadata (iteration, response opcode, etc.) - useful
 // for triage but optional.
 package corpus
 
@@ -28,7 +28,7 @@ import (
 	"strings"
 )
 
-// Category names — also the subdir names.
+// Category names - also the subdir names.
 const (
 	CatCorpus  = "corpus"
 	CatQueue   = "queue"

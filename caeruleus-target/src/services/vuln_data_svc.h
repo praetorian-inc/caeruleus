@@ -1,5 +1,5 @@
 /**
- * vuln_data_svc.h — Vulnerable Data Service (0xBEEF)
+ * vuln_data_svc.h - Vulnerable Data Service (0xBEEF)
  *
  * Deliberately vulnerable BLE service for security testing.
  * Exposes plaintext credentials, unvalidated token storage,
@@ -23,7 +23,7 @@ extern "C" {
 #endif
 
 /* -------------------------------------------------------------------------
- * UUIDs — from sdk_config.h
+ * UUIDs - from sdk_config.h
  * ------------------------------------------------------------------------- */
 
 /** 128-bit base UUID: XXXXXXXX-CAFE-BABE-DEAD-CAERULEUS00 */

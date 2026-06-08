@@ -14,7 +14,7 @@ import (
 )
 
 // Response is the minimum information the engine extracts from a single
-// write-then-read cycle. Disconnected/Timeout are independent — a
+// write-then-read cycle. Disconnected/Timeout are independent - a
 // timeout in the absence of disconnect typically signals app-layer hang.
 type Response struct {
 	Disconnected bool
@@ -83,7 +83,7 @@ func stateKey(writeOp uint8, r Response) uint64 {
 }
 
 // lengthBucket maps a response length to a small bucket index. The exact
-// bucket boundaries are tuned to ATT — BLE PDUs are 0-251 bytes; common
+// bucket boundaries are tuned to ATT - BLE PDUs are 0-251 bytes; common
 // shapes (empty Write Response, 5-byte Error Response, 23-byte default
 // MTU read) get their own bucket.
 func lengthBucket(n int) uint8 {

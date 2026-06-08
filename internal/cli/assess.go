@@ -181,8 +181,7 @@ func charValuePreview(c *bluez.Characteristic) (string, []byte, error) {
 // --- shared output ------------------------------------------------------
 
 // emitAssess renders an assessResult as JSON (machine path) or a sorted
-// severity table (human path). Always returns nil for a clean exit code —
-// findings are observations, not a failed command.
+// severity table (human path). Always returns nil for a clean exit code - // findings are observations, not a failed command.
 func emitAssess(res assessResult) error {
 	// Highest severity first, then by handle for stable ordering.
 	sort.SliceStable(res.Findings, func(i, j int) bool {
@@ -197,7 +196,7 @@ func emitAssess(res assessResult) error {
 		return emitJSON(res)
 	}
 
-	fmt.Printf("# %s assessment — %s\n", res.Test, res.Address)
+	fmt.Printf("# %s assessment - %s\n", res.Test, res.Address)
 	if res.Summary != "" {
 		fmt.Printf("%s\n", res.Summary)
 	}

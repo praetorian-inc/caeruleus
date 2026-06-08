@@ -1,5 +1,5 @@
 /**
- * main.c — Caeruleus-Target: Deliberately vulnerable nRF52840 BLE firmware
+ * main.c - Caeruleus-Target: Deliberately vulnerable nRF52840 BLE firmware
  *
  * Hardware: nRF52840 DK (PCA10056) / Makerdiary nRF52840 MDK USB Dongle
  * SDK:      nRF5 SDK 17.1.0 + SoftDevice S140 v7.2.0
@@ -53,13 +53,13 @@ NRF_BLE_GATT_DEF(m_gatt);
 NRF_BLE_QWR_DEF(m_qwr);
 BLE_ADVERTISING_DEF(m_advertising);
 
-/* Sensor Simulation Service — auto-registers BLE observer via macro */
+/* Sensor Simulation Service - auto-registers BLE observer via macro */
 BLE_SENSOR_SIM_DEF(m_sensor_sim);
 
 /* Command & Control Service instance (observer registered in cmd_ctrl_svc.c) */
 static ble_cmd_ctrl_svc_t m_cmd_ctrl_svc;
 
-/* Vuln Data Service — singleton, needs observer registered here */
+/* Vuln Data Service - singleton, needs observer registered here */
 NRF_SDH_BLE_OBSERVER(m_vuln_data_obs, 2, ble_vuln_data_svc_on_ble_evt, NULL);
 
 /* App timer for sensor notification interval */
@@ -77,7 +77,7 @@ void app_error_fault_handler(uint32_t id, uint32_t pc, uint32_t info)
     NRF_LOG_ERROR("Fatal error: id=%u pc=0x%08X info=0x%08X", id, pc, info);
     NRF_LOG_FINAL_FLUSH();
 
-    /* No __BKPT — dongle has no debugger, BKPT causes HardFault loop */
+    /* No __BKPT - dongle has no debugger, BKPT causes HardFault loop */
     NVIC_SystemReset();
 }
 
@@ -111,14 +111,14 @@ static void gap_params_init(void)
     ble_gap_conn_params_t   gap_conn_params;
     ble_gap_conn_sec_mode_t sec_mode;
 
-    /* Device name — open, no security */
+    /* Device name - open, no security */
     BLE_GAP_CONN_SEC_MODE_SET_OPEN(&sec_mode);
     err_code = sd_ble_gap_device_name_set(&sec_mode,
                                           (const uint8_t *)DEVICE_NAME,
                                           strlen(DEVICE_NAME));
     APP_ERROR_CHECK(err_code);
 
-    /* Connection parameters — deliberately weak (from sdk_config.h) */
+    /* Connection parameters - deliberately weak (from sdk_config.h) */
     memset(&gap_conn_params, 0, sizeof(gap_conn_params));
     gap_conn_params.min_conn_interval = MIN_CONN_INTERVAL;
     gap_conn_params.max_conn_interval = MAX_CONN_INTERVAL;
@@ -165,7 +165,7 @@ static void services_init(void)
     err_code = nrf_ble_qwr_init(&m_qwr, &qwr_init);
     APP_ERROR_CHECK(err_code);
 
-    /* --- Device Information Service (0x180A) — standard SDK service --- */
+    /* --- Device Information Service (0x180A) - standard SDK service --- */
     ble_dis_init_t dis_init;
     memset(&dis_init, 0, sizeof(dis_init));
 
@@ -197,7 +197,7 @@ static void services_init(void)
 
     /* Nordic DFU Service (0xFE59) runs in the bootloader firmware,
      * not here. The bootloader exposes 0xFE59 with unsigned acceptance. */
-    NRF_LOG_INFO("Nordic DFU Service (0xFE59) available via bootloader — UNSIGNED, NO ROLLBACK PROTECTION");
+    NRF_LOG_INFO("Nordic DFU Service (0xFE59) available via bootloader - UNSIGNED, NO ROLLBACK PROTECTION");
 }
 
 /* ==========================================================================
@@ -213,8 +213,8 @@ static void on_adv_evt(ble_adv_evt_t ble_adv_evt)
             break;
 
         case BLE_ADV_EVT_IDLE:
-            /* Restart advertising when it stops — never stop advertising */
-            NRF_LOG_INFO("Advertising idle — restarting");
+            /* Restart advertising when it stops - never stop advertising */
+            NRF_LOG_INFO("Advertising idle - restarting");
             ret_code_t err_code = ble_advertising_start(&m_advertising, BLE_ADV_MODE_FAST);
             APP_ERROR_CHECK(err_code);
             break;
@@ -273,7 +273,7 @@ static void on_conn_params_evt(ble_conn_params_evt_t *p_evt)
 {
     if (p_evt->evt_type == BLE_CONN_PARAMS_EVT_FAILED)
     {
-        NRF_LOG_WARNING("Connection params negotiation failed — disconnecting");
+        NRF_LOG_WARNING("Connection params negotiation failed - disconnecting");
         ret_code_t err_code = sd_ble_gap_disconnect(p_evt->conn_handle,
                                                      BLE_HCI_CONN_INTERVAL_UNACCEPTABLE);
         APP_ERROR_CHECK(err_code);
@@ -306,7 +306,7 @@ static void conn_params_init(void)
 }
 
 /* ==========================================================================
- * Peer Manager — Just Works pairing, deliberately weak
+ * Peer Manager - Just Works pairing, deliberately weak
  * ========================================================================== */
 
 static void pm_evt_handler(pm_evt_t const *p_evt)
@@ -322,7 +322,7 @@ static void pm_evt_handler(pm_evt_t const *p_evt)
             break;
 
         case PM_EVT_CONN_SEC_SUCCEEDED:
-            NRF_LOG_INFO("Connection secured — link encrypted (Just Works)");
+            NRF_LOG_INFO("Connection secured - link encrypted (Just Works)");
             break;
 
         case PM_EVT_CONN_SEC_FAILED:
@@ -344,7 +344,7 @@ static void peer_manager_init(void)
 
     memset(&sec_param, 0, sizeof(sec_param));
 
-    /* Security parameters — deliberately weak (Just Works, no MITM) */
+    /* Security parameters - deliberately weak (Just Works, no MITM) */
     sec_param.bond           = SEC_PARAM_BOND;
     sec_param.mitm           = SEC_PARAM_MITM;
     sec_param.lesc           = SEC_PARAM_LESC;
@@ -462,7 +462,7 @@ int main(void)
     /* Start sensor notification timer */
     timers_start();
 
-    NRF_LOG_INFO("All services initialized — advertising as \"%s\"", DEVICE_NAME);
+    NRF_LOG_INFO("All services initialized - advertising as \"%s\"", DEVICE_NAME);
 
     /* Main loop */
     for (;;)
