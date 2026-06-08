@@ -51,6 +51,7 @@ Add `-o json` to any command to get machine-readable output for scripting or rep
 | `primary -b A` / `characteristics -b A` | gatttool-style service / characteristic listing. |
 | `read -b A (-a 0xHND \| -u UUID) [--watch --every D] [--extract]` | Read; `--extract` emits bare hex for piping. |
 | `write -b A (-a 0xHND\|-u UUID) (-n HEX \| -s STR) [--req] [--each-line]` | Write; `--req` forces write-with-response. |
+| `raw-write -b A -a 0xHND (-n HEX \| --length N --pattern HH)` | Single-PDU ATT Write Request over raw L2CAP (oversized, bypasses BlueZ fragmentation; root). |
 | `listen -b A -a 0xHND [--trigger-value HEX] [--duration D]` | Subscribe to notifications/indications. |
 | `cccd -b A (--char UUID\|--handle 0xHND) --enable notify\|indicate\|off [--raw]` | Manipulate the CCCD directly. |
 | `mtu -b A --show` | Show negotiated ATT MTU (`--set N` reconfigures bluetoothd; root). |
