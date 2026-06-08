@@ -9,6 +9,18 @@
 .local/
 .output/
 
+# Go build artifacts (binaries built at repo root)
+/caeruleus
+/shell-harness
+*.swp
+*.swo
+.idea/
+.vscode/
+
+# Fuzzing output
+fuzz-out-*/
+fuzz-out/
+
 # Node
 node_modules/
 
