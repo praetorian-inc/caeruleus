@@ -2,6 +2,9 @@ package cli
 
 import (
 	"fmt"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -61,6 +64,17 @@ func runAssessPairing(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	defer dev.Close()
+	// We have taken the controller down to bind the user channel; make sure a
+	// SIGINT/SIGTERM still restores it (deferred Close is skipped on signal).
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+	defer signal.Stop(sigCh)
+	go func() {
+		if _, ok := <-sigCh; ok {
+			dev.Close()
+			os.Exit(130)
+		}
+	}()
 
 	res := assessResult{Address: addr, Test: "pairing"}
 

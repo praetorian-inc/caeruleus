@@ -85,32 +85,10 @@ func runRawWrite(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	at := uint8(l2cap.BDADDRLEPublic)
-	if root.addrType == "random" {
-		at = l2cap.BDADDRLERandom
-	}
-
-	le, err := bdaddrPkg.ParseMAC(addrStr)
+	statusf("dialing L2CAP CID 0x0004 -> %s (type=%s)", addrStr, root.addrType)
+	conn, err := dialRawATT(addrStr)
 	if err != nil {
 		return err
-	}
-	var peer [6]byte
-	for i := 0; i < 6; i++ {
-		peer[i] = le[5-i]
-	}
-
-	statusf("dialing L2CAP CID 0x0004 -> %s (type=%s)", addrStr, root.addrType)
-	conn, err := l2cap.Dial(peer, at)
-	if err != nil && isResourceBusy(err) {
-		logf("L2CAP EBUSY - disconnecting BlueZ from %s and retrying", addrStr)
-		if derr := detachBlueZ(addrStr); derr != nil {
-			return fmt.Errorf("detach BlueZ: %w (original dial error: %v)", derr, err)
-		}
-		time.Sleep(300 * time.Millisecond)
-		conn, err = l2cap.Dial(peer, at)
-	}
-	if err != nil {
-		return fmt.Errorf("l2cap dial: %w", err)
 	}
 	defer conn.Close()
 
@@ -130,6 +108,40 @@ func runRawWrite(cmd *cobra.Command, args []string) error {
 			handle, len(value), r.Opcode, len(r.Body))
 	}
 	return nil
+}
+
+// dialRawATT opens a raw L2CAP socket on the ATT fixed channel (CID 0x0004) to
+// addr, honoring --addr-type. If BlueZ is holding the link the kernel returns
+// EBUSY; we detach BlueZ (Device1.Disconnect) and retry once. The caller closes
+// the returned conn. Raw ATT bypasses BlueZ's GATT layer entirely, so reads and
+// writes over it never trigger an SMP security elevation / bond - which is why
+// the encryption baseline uses it to classify gated handles without pairing.
+func dialRawATT(addr string) (*l2cap.Conn, error) {
+	at := uint8(l2cap.BDADDRLEPublic)
+	if root.addrType == "random" {
+		at = l2cap.BDADDRLERandom
+	}
+	le, err := bdaddrPkg.ParseMAC(addr)
+	if err != nil {
+		return nil, err
+	}
+	var peer [6]byte
+	for i := 0; i < 6; i++ {
+		peer[i] = le[5-i]
+	}
+	conn, err := l2cap.Dial(peer, at)
+	if err != nil && isResourceBusy(err) {
+		logf("L2CAP EBUSY - disconnecting BlueZ from %s and retrying", addr)
+		if derr := detachBlueZ(addr); derr != nil {
+			return nil, fmt.Errorf("detach BlueZ: %w (original dial error: %v)", derr, err)
+		}
+		time.Sleep(300 * time.Millisecond)
+		conn, err = l2cap.Dial(peer, at)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("l2cap dial: %w", err)
+	}
+	return conn, nil
 }
 
 func parsePatternByte(s string) (byte, error) {
