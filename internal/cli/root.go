@@ -35,7 +35,7 @@ mtu --set/--reset) require root.`
 	// Show the wordmark only when the terminal is wide enough for it.
 	long := desc
 	if showBanner() {
-		long = bannerArt + "\n" + desc
+		long = bannerArt + desc
 	}
 
 	cmd := &cobra.Command{
