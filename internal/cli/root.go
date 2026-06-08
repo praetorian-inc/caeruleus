@@ -25,7 +25,8 @@ func newRoot() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "caeruleus",
 		Short: "BLE GATT toolkit (gatttool/gratttool-style, written in Go)",
-		Long: `caeruleus is a small command-line client for BLE GATT servers.
+		Long: bannerArt + `
+caeruleus is a small command-line client for BLE GATT servers.
 
 It talks to bluetoothd over D-Bus (BlueZ Adapter1/Device1/GattCharacteristic1)
 and provides subcommands for scanning, enumerating, reading, writing, and
