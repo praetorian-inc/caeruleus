@@ -34,3 +34,7 @@ __pycache__/
 *.out
 *.map
 *.in
+
+# DUT test firmware (kept locally, maintained outside this repo)
+/caeruleus-target/
+/caeruleus-target-secure/

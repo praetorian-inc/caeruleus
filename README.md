@@ -34,8 +34,6 @@ caeruleus/
 │   ├── bdaddr/           # adapter BD_ADDR read/spoof (vendor HCI)
 │   └── fuzz/             # fuzzing: mutation engine, corpus, crash/hang triage
 ├── skills/caeruleus/     # the Go-driven Agent Skill (portable; agentskills.io format)
-├── caeruleus-target/     # deliberately-vulnerable nRF52840 DUT firmware (no auth)
-├── caeruleus-target-secure/  # second DUT: enforced pairing/encryption + buttonless DFU
 └── docs/                 # fuzzing-plan.md, ux-improvements.md
 ```
 
@@ -71,17 +69,6 @@ sudo ./caeruleus conn-params -b AA:BB:CC:DD:EE:FF        # root: HCI monitor
 ```
 
 Privileged commands (`conn-params`, `monitor`, `fuzz write --raw`, `cccd --raw`, `raw-write`, `mtu --set`, `bdaddr --set`) need root; see the skill doc for a scoped sudoers drop-in.
-
-## Caeruleus-Target (Vulnerable DUT Firmware)
-
-The `caeruleus-target/` directory contains deliberately vulnerable nRF52840 BLE firmware for validating the toolkit. See [`caeruleus-target/README.md`](caeruleus-target/README.md) for build instructions and the full vulnerability matrix.
-
-**GATT profile highlights:**
-- Plaintext credentials and PII exposed over BLE
-- No pairing or encryption enforcement
-- Buffer overflow → HardFault on oversized writes
-- No replay protection
-- Unsigned DFU firmware acceptance
 
 ## Concurrency
 
