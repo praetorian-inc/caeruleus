@@ -10,7 +10,7 @@ func newFuzzCmd() *cobra.Command {
 		Use:   "fuzz",
 		Short: "Fuzz a GATT server (mutates writes, classifies responses)",
 		Long: `Fuzzing subsystem. Drives a target characteristic with mutated values,
-classifies the responses (AFLNet-style response-tuple hashing), and saves
+classifies the responses, and saves
 inputs that produced new states or crash signals to an on-disk corpus.
 
 Subcommands:

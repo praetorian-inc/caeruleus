@@ -140,7 +140,9 @@ func runShell(cmd *cobra.Command, args []string) error {
 	defer stopNotify()
 	sh.startNotificationPump(notifyCtx)
 
-	color.New(color.FgCyan).Fprint(rl.Stderr(), bannerArt)
+	if showBanner() {
+		color.New(color.FgCyan).Fprint(rl.Stderr(), bannerArt)
+	}
 	color.New(color.FgHiBlack).Fprintln(rl.Stderr(), "caeruleus shell — type 'help' or 'quit'.")
 	for {
 		rl.SetPrompt(shellPrompt(sh.s))

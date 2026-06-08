@@ -50,7 +50,7 @@ var fuzzWriteFlags struct {
 func newFuzzWriteCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "write",
-		Short: "Fuzz writes to a single characteristic (Phase 1a: write_req, write_cmd)",
+		Short: "Fuzz writes to a single characteristic",
 		Long: `Fuzz a single GATT characteristic by mutating writes. The default seed
 is the current value of the target characteristic (auto-read at startup);
 override with --seed-file / --seed / --seed-dir.
@@ -65,7 +65,7 @@ Each iteration:
   7. Admit to crashes/ if the target disconnected; hangs/ if the reset
      hook had to fire and didn't fully recover
 
-Output (default ./fuzz-out-<ISO>/) is AFL-style: one file per input under
+Output (default ./fuzz-out-<ISO>/): one file per input under
 corpus/ queue/ crashes/ hangs/, plus run.json + trace.jsonl.
 
 Write variants:
@@ -73,7 +73,7 @@ Write variants:
   --type cmd    Write Command (0x52), no response oracle (liveness only)
   --type both   randomly alternate
 
-Phase 1b add-ons (--include implies --raw, needs root):
+Extra opcodes (--include implies --raw, needs root):
   --include prep   Prepare Write Request (0x16); input is [offset:LE16 | value]
   --include exec   Execute Write Request (0x18); input first byte = flags (LSB:
                    0 cancel, 1 commit)
@@ -92,7 +92,7 @@ Examples:
       --max-iter 1000000 \
       --target-reset "ssh root@plug ./toggle.sh && sleep 8"
 
-  # Phase 1b: prep + exec via raw L2CAP — fuzz the prepared-write queue
+  # prep + exec via raw L2CAP — fuzz the prepared-write queue
   sudo caeruleus -b AA:BB:CC:DD:EE:FF fuzz write -a 0x002c \
       --type both --include prep,exec --max-iter 5000`,
 		RunE: runFuzzWrite,
@@ -108,7 +108,7 @@ Examples:
 	c.Flags().DurationVar(&fuzzWriteFlags.maxTime, "max-time", 0, "wall-clock cap (e.g. 30m, 8h)")
 	c.Flags().IntVar(&fuzzWriteFlags.maxValueLen, "max-value-len", 244, "hard cap on mutated input length (244 = MTU 247 - 3 ATT bytes)")
 	c.Flags().StringVar(&fuzzWriteFlags.types, "type", "req", "write variant(s): req | cmd | both")
-	c.Flags().StringVar(&fuzzWriteFlags.include, "include", "", "extra opcodes to enable, comma-separated: prep, exec (Phase 1b — implies --raw)")
+	c.Flags().StringVar(&fuzzWriteFlags.include, "include", "", "extra opcodes to enable, comma-separated: prep, exec (implies --raw)")
 	c.Flags().BoolVar(&fuzzWriteFlags.raw, "raw", false, "drive writes via raw L2CAP/ATT (Layer B) instead of BlueZ D-Bus; required for prep/exec")
 	c.Flags().StringVar(&fuzzWriteFlags.livenessHandle, "liveness-handle", "", "override auto-detected liveness handle")
 	c.Flags().IntVar(&fuzzWriteFlags.livenessEvery, "liveness-every", 10, "probe target liveness every N iterations")
@@ -116,7 +116,7 @@ Examples:
 	c.Flags().StringVar(&fuzzWriteFlags.targetReset, "target-reset", "", "shell command to reset the target after consecutive liveness failures")
 	c.Flags().IntVar(&fuzzWriteFlags.targetResetAfter, "target-reset-after", 3, "fire --target-reset after this many consecutive liveness failures")
 	c.Flags().StringVar(&fuzzWriteFlags.outDir, "out", "", "corpus output directory (default ./fuzz-out-<ISO>/)")
-	c.Flags().BoolVar(&fuzzWriteFlags.noStateFeedback, "no-state-feedback", false, "treat every input as parentless; disable AFLNet-style queue")
+	c.Flags().BoolVar(&fuzzWriteFlags.noStateFeedback, "no-state-feedback", false, "treat every input as parentless; disable input prioritisation")
 	c.Flags().BoolVar(&fuzzWriteFlags.noBoundarySeeds, "no-boundary-seeds", false, "in --raw mode, skip the auto-added MTU-boundary length seeds")
 	return c
 }
@@ -549,7 +549,7 @@ func (h *bluezHarness) Write(ctx context.Context, op engine.Op, value []byte) en
 	default:
 		return engine.WriteResult{
 			Resp: oracle.Response{},
-			Err:  fmt.Errorf("BlueZ Layer A harness does not support op %s (use --raw / Phase 1b)", op),
+			Err:  fmt.Errorf("BlueZ Layer A harness does not support op %s (use --raw)", op),
 		}
 	}
 

@@ -1,6 +1,6 @@
 # Caeruleus
 
-Caeruleus is a hardware-agnostic BLE security testing toolkit for Linux/BlueZ, implemented as a single Go binary (`caeruleus`). It covers the full interaction-to-assessment lifecycle — scan, enumerate, read/write/notify, coverage-guided fuzzing, and structured security assessment — talking to peripherals directly over BlueZ D-Bus and raw L2CAP/HCI sockets. A portable [Agent Skill](https://agentskills.io) (`skills/caeruleus/`) orchestrates the binary's `-o json` output into assessment workflows and reports, and works with any Agent Skills-compatible agent.
+Caeruleus is a hardware-agnostic BLE security testing toolkit for Linux/BlueZ, implemented as a single Go binary (`caeruleus`). It covers the full interaction-to-assessment lifecycle — scan, enumerate, read/write/notify, fuzzing, and structured security assessment — talking to peripherals directly over BlueZ D-Bus and raw L2CAP/HCI sockets. A portable [Agent Skill](https://agentskills.io) (`skills/caeruleus/`) orchestrates the binary's `-o json` output into assessment workflows and reports, and works with any Agent Skills-compatible agent.
 
 *caeruleus* — Latin for "blue"
 
@@ -32,7 +32,7 @@ caeruleus/
 │   ├── l2cap/            # raw L2CAP ATT socket
 │   ├── hcimon/           # HCI monitor decode (notifications + connection params)
 │   ├── bdaddr/           # adapter BD_ADDR read/spoof (vendor HCI)
-│   └── fuzz/             # engine, mutator, AFLNet-style oracle, corpus, trace
+│   └── fuzz/             # fuzzing: mutation engine, corpus, crash/hang triage
 ├── skills/caeruleus/     # the Go-driven Agent Skill (portable; agentskills.io format)
 ├── caeruleus-target/     # deliberately-vulnerable nRF52840 DUT firmware
 └── docs/                 # fuzzing-plan.md, ux-improvements.md

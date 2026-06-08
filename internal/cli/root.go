@@ -22,11 +22,10 @@ type rootFlags struct {
 var root rootFlags
 
 func newRoot() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "caeruleus",
-		Short: "BLE GATT toolkit (gatttool/gratttool-style, written in Go)",
-		Long: bannerArt + `
-caeruleus is a small command-line client for BLE GATT servers.
+	// Preserve our grouped insertion order in help instead of alphabetising.
+	cobra.EnableCommandSorting = false
+
+	const desc = `caeruleus is a small command-line client for BLE GATT servers.
 
 It talks to bluetoothd over D-Bus (BlueZ Adapter1/Device1/GattCharacteristic1)
 and provides subcommands for scanning, enumerating, reading, writing, and
@@ -35,7 +34,18 @@ mtu --set/--reset) require root.
 
 Shell completion: source the cobra-generated script for your shell, e.g.
   source <(caeruleus completion bash)    # or: zsh, fish, powershell
-Install permanently via the manifest your distro uses for completions.`,
+Install permanently via the manifest your distro uses for completions.`
+
+	// Show the wordmark only when the terminal is wide enough for it.
+	long := desc
+	if showBanner() {
+		long = bannerArt + "\n" + desc
+	}
+
+	cmd := &cobra.Command{
+		Use:           "caeruleus",
+		Short:         "BLE GATT toolkit (gatttool/gratttool-style, written in Go)",
+		Long:          long,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
@@ -68,33 +78,34 @@ Install permanently via the manifest your distro uses for completions.`,
 		}
 	}
 
-	cmd.AddCommand(
-		newScanCmd(),
-		newEnumerateCmd(),
-		newReadCmd(),
-		newWriteCmd(),
-		newListenCmd(),
-		newShellCmd(),
-		newPrimaryCmd(),
-		newCharacteristicsCmd(),
-		newMonitorCmd(),
-		newMTUCmd(),
-		newBdaddrCmd(),
-		newDisconnectCmd(),
-		newForgetCmd(),
-		newPairCmd(),
-		newUnpairCmd(),
-		newConnParamsCmd(),
-		newReconCmd(),
-		newAssessCmd(),
-		newBatchCmd(),
-		newServeCmd(),
-		newSendCmd(),
-		newCCCDCmd(),
-		newAdapterCmd(),
-		newDoctorCmd(),
-		newFuzzCmd(),
-		newRawWriteCmd(),
+	// Group commands in help the same way the README does, in a sensible
+	// workflow order within each group (discovery -> interaction; recon ->
+	// active tests; fuzzing; adapter/diagnostics). `help` and `completion`
+	// stay ungrouped under "Additional Commands".
+	cmd.AddGroup(
+		&cobra.Group{ID: "interact", Title: "Discovery & interaction:"},
+		&cobra.Group{ID: "assess", Title: "Security assessment:"},
+		&cobra.Group{ID: "fuzz", Title: "Fuzzing:"},
+		&cobra.Group{ID: "diag", Title: "Adapter & diagnostics:"},
+	)
+	add := func(group string, cmds ...*cobra.Command) {
+		for _, c := range cmds {
+			c.GroupID = group
+			cmd.AddCommand(c)
+		}
+	}
+	add("interact",
+		newScanCmd(), newEnumerateCmd(), newPrimaryCmd(), newCharacteristicsCmd(),
+		newReadCmd(), newWriteCmd(), newListenCmd(), newCCCDCmd(), newMTUCmd(),
+		newShellCmd(), newBatchCmd(), newServeCmd(), newSendCmd(),
+	)
+	add("assess",
+		newReconCmd(), newAssessCmd(), newPairCmd(), newUnpairCmd(), newConnParamsCmd(),
+	)
+	add("fuzz", newFuzzCmd())
+	add("diag",
+		newDoctorCmd(), newAdapterCmd(), newDisconnectCmd(), newForgetCmd(),
+		newBdaddrCmd(), newMonitorCmd(), newRawWriteCmd(),
 	)
 	return cmd
 }

@@ -1,6 +1,6 @@
 ---
 name: caeruleus
-description: Use when performing hardware-agnostic BLE security testing on Linux/BlueZ - device scanning, GATT enumeration, read/write/notify interaction, coverage-guided fuzzing, and security assessment (unauthenticated read/write exposure, encryption enforcement, DFU entry, write-without-response abuse, connection parameters). Drives the single Go `caeruleus` binary; no separate server process, no external tool wrapping.
+description: Use when performing hardware-agnostic BLE security testing on Linux/BlueZ - device scanning, GATT enumeration, read/write/notify interaction, fuzzing, and security assessment (unauthenticated read/write exposure, encryption enforcement, DFU entry, write-without-response abuse, connection parameters). Drives the single Go `caeruleus` binary; no separate server process, no external tool wrapping.
 compatibility: Linux with BlueZ (bluetoothd) and a standard BLE adapter; build with the Go toolchain (1.25+). Some commands require root (raw HCI/L2CAP sockets). Harness-agnostic — usable from any Agent Skills-compatible agent.
 allowed-tools: Bash Read
 ---
@@ -15,7 +15,7 @@ Scope is deliberately **hardware-agnostic and self-contained**: it needs only a 
 
 - Interacting with a BLE peripheral: scan, enumerate GATT, read/write characteristics, subscribe to notifications.
 - Assessing a peripheral's security posture: what an unpaired attacker can read/write, whether encryption is enforced, DFU exposure, write-without-response resilience, connection parameters.
-- Fuzzing a writable characteristic (coverage-guided, AFL-style corpus + crash/hang triage).
+- Fuzzing a writable characteristic for crashes/hangs (with an on-disk corpus).
 - Recovering a wedged adapter / stuck BlueZ connection during testing.
 
 If the task needs off-path sniffing of *other* devices' traffic, or a MITM relay/peripheral clone, that is out of scope for this tool — use dedicated sniffer/relay hardware separately.
@@ -95,7 +95,7 @@ All emit `{address, test, summary, findings[]}`; findings carry `severity` (info
 ### Fuzzing
 | Command | Purpose |
 |---|---|
-| `fuzz write -b A -a 0xHND [--type req\|cmd\|both] [--max-iter N] [--max-time D]` | Coverage-guided write fuzzing (AFL-style corpus, AFLNet state oracle, crash/hang triage). Output dir `fuzz-out-<ts>/`. |
+| `fuzz write -b A -a 0xHND [--type req\|cmd\|both] [--max-iter N] [--max-time D]` | Write fuzzing with an on-disk corpus and crash/hang triage. Output dir `fuzz-out-<ts>/`. |
 | `fuzz write … --raw [--include prep,exec]` | Drive raw L2CAP solo (oversized single-PDU + Prepare/Execute writes); root. |
 | `fuzz write … --target-reset "CMD" [--liveness-every N]` | Run a recovery shell command when the target wedges. |
 | `fuzz replay DIR/file [--op req\|cmd]` | Re-send a saved corpus/crash input to reproduce. |
