@@ -13,6 +13,8 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/sys/unix"
+
 	"caeruleus/internal/bluez"
 )
 
@@ -286,6 +288,24 @@ func failf(format string, args ...interface{}) {
 		return
 	}
 	fmt.Fprintf(os.Stderr, "[-] "+format+"\n", args...)
+}
+
+// termWidth returns the column width of the terminal on stdout, or 0 when
+// stdout is not a terminal (piped/redirected) or the size can't be read.
+// Callers use 0 to mean "don't constrain output" — piping to a file or grep
+// wants the full, unwrapped width.
+func termWidth() int {
+	if ws, err := unix.IoctlGetWinsize(int(os.Stdout.Fd()), unix.TIOCGWINSZ); err == nil && ws != nil && ws.Col > 0 {
+		return int(ws.Col)
+	}
+	// Not a TTY (piped/redirected): leave output unconstrained unless the
+	// caller explicitly sets COLUMNS — useful as an override and for tests.
+	if c := os.Getenv("COLUMNS"); c != "" {
+		if n, err := strconv.Atoi(strings.TrimSpace(c)); err == nil && n > 0 {
+			return n
+		}
+	}
+	return 0
 }
 
 // pollUntil polls pred at the given interval until it returns true or

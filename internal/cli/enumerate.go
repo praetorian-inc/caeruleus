@@ -35,13 +35,13 @@ func newEnumerateCmd() *cobra.Command {
 }
 
 type enumRow struct {
-	Service        string `json:"service"`
-	ServiceHandle  uint16 `json:"service_handle"`
-	CharHandle     uint16 `json:"char_handle"`
-	CharUUID       string `json:"char_uuid"`
-	Properties     string `json:"properties"`
-	ValueHex       string `json:"value_hex,omitempty"`
-	ValueASCII     string `json:"value_ascii,omitempty"`
+	Service        string    `json:"service"`
+	ServiceHandle  uint16    `json:"service_handle"`
+	CharHandle     uint16    `json:"char_handle"`
+	CharUUID       string    `json:"char_uuid"`
+	Properties     string    `json:"properties"`
+	ValueHex       string    `json:"value_hex,omitempty"`
+	ValueASCII     string    `json:"value_ascii,omitempty"`
 	DescriptorRows []descRow `json:"descriptors,omitempty"`
 }
 
@@ -98,11 +98,52 @@ func runEnumerate(cmd *cobra.Command, args []string) error {
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
 	t.AppendHeader(table.Row{"SVC HND", "CHR HND", "CHR UUID", "PROPS", "HEX", "ASCII"})
+
+	// On a real terminal, bound the wide columns so the rendered box never
+	// exceeds the terminal width — otherwise the terminal hard-wraps each line
+	// and the box borders shatter. Piped/redirected output (width 0) is left
+	// unconstrained so files and grep get full, single-line values.
+	if w := termWidth(); w > 0 {
+		// Size the wrappable columns so the natural table width fits inside w
+		// (otherwise SetAllowedRowLength would chop the right border off).
+		// Budget: SVC HND(7) + CHR HND(10) + PROPS(9) + 6-column decoration(19)
+		// = 45, with a 2-col safety margin. Whatever's left is split across the
+		// UUID / HEX / ASCII columns, which wrap rather than overflow.
+		avail := w - 47
+		if avail < 18 {
+			avail = 18
+		}
+		// UUID ~30% (adopted shrink to 0xXXXX; custom 128-bit wraps), clamped to
+		// the header width .. full-UUID range.
+		uuidW := avail * 3 / 10
+		if uuidW < 8 {
+			uuidW = 8
+		} else if uuidW > 36 {
+			uuidW = 36
+		}
+		// Split the remainder favouring ASCII over HEX: keep the decoded text
+		// readable on one line and let the hex dump (twice as wide per byte, so
+		// the cheapest to wrap) absorb the squeeze.
+		valSpace := avail - uuidW
+		if valSpace < 10 {
+			valSpace = 10
+		}
+		asciiW := valSpace * 2 / 3
+		hexW := valSpace - asciiW
+		t.SetColumnConfigs([]table.ColumnConfig{
+			{Number: 3, WidthMax: uuidW, WidthMaxEnforcer: text.WrapText},
+			{Number: 4, WidthMax: 9, WidthMaxEnforcer: text.WrapText},
+			{Number: 5, WidthMax: hexW, WidthMaxEnforcer: text.WrapText},
+			{Number: 6, WidthMax: asciiW, WidthMaxEnforcer: text.WrapText},
+		})
+		t.SetAllowedRowLength(w)
+	}
+
 	for _, r := range rows {
 		t.AppendRow(table.Row{
 			fmt.Sprintf("0x%04x", r.ServiceHandle),
 			fmt.Sprintf("0x%04x", r.CharHandle),
-			r.CharUUID,
+			shortUUID(r.CharUUID),
 			r.Properties,
 			truncate(r.ValueHex, enumerateFlags.maxLen*3),
 			truncate(r.ValueASCII, enumerateFlags.maxLen),
@@ -111,7 +152,7 @@ func runEnumerate(cmd *cobra.Command, args []string) error {
 			t.AppendRow(table.Row{
 				"",
 				fmt.Sprintf("  ↳ 0x%04x", d.Handle),
-				text.FgHiBlack.Sprint(d.UUID),
+				text.FgHiBlack.Sprint(shortUUID(d.UUID)),
 				text.FgHiBlack.Sprint("desc"),
 				text.FgHiBlack.Sprint(d.Value),
 				"",
@@ -207,6 +248,16 @@ func formatProps(flags []string) string {
 		}
 	}
 	return strings.Join(short, ",")
+}
+
+// shortUUID renders adopted (SIG-base) 128-bit UUIDs in their compact 0xXXXX
+// form for display; custom/vendor UUIDs are returned unchanged. Display-only —
+// the JSON output keeps the full canonical UUID.
+func shortUUID(u string) string {
+	if len(u) >= 8 && isSIGBaseUUID(u) {
+		return "0x" + strings.ToUpper(u[4:8])
+	}
+	return u
 }
 
 func propsCan(flags []string, target string) bool {
