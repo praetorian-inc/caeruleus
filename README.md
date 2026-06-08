@@ -51,7 +51,7 @@ make test         # unit tests + shell tests
 | Group | Commands |
 |---|---|
 | Discovery / interaction | `scan`, `enumerate`, `primary`, `characteristics`, `read`, `write`, `listen`, `cccd`, `mtu`, `shell`, `batch`, `serve`/`send` |
-| Security assessment | `recon`, `assess auth-bypass`, `assess encryption`, `assess dfu`, `assess wwr`, `pair`/`unpair`, `conn-params` |
+| Security assessment | `recon`, `assess check-auth`, `assess encryption`, `assess dfu`, `assess wwr`, `pair`/`unpair`, `conn-params` |
 | Fuzzing | `fuzz write` (incl. `--raw`), `fuzz replay` |
 | Adapter / diagnostics | `doctor`, `adapter`, `disconnect`, `forget`, `bdaddr`, `monitor`, `raw-write` |
 
@@ -63,7 +63,7 @@ Every command takes `-b/--bdaddr`, `-i/--adapter`, `-t/--timeout`, and `-o/--for
 make build
 ./caeruleus scan -t 6
 ./caeruleus recon -b AA:BB:CC:DD:EE:FF
-./caeruleus assess auth-bypass -b AA:BB:CC:DD:EE:FF -o json
+./caeruleus assess check-auth -b AA:BB:CC:DD:EE:FF -o json
 sudo ./caeruleus conn-params -b AA:BB:CC:DD:EE:FF        # root: HCI monitor
 ```
 

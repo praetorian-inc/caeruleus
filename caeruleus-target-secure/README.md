@@ -60,7 +60,7 @@ A=<bdaddr of Caeruleus-Secure>     # from: ./caeruleus scan ; it advertises as "
 ./caeruleus recon -b $A -o json
 
 # Unpaired exposure: Info reads; Secret/Config report auth-required.
-./caeruleus assess auth-bypass -b $A
+./caeruleus assess check-auth -b $A
 
 # Pairing: Just Works bond should complete.
 ./caeruleus pair -b $A           # expect paired=true bonded=true

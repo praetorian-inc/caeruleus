@@ -45,6 +45,9 @@ mtu --set/--reset) require root.`
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
+	// Replace cobra's built-in completion command with one whose install
+	// instructions target a user-writable location (no sudo / root-owned fpath).
+	cmd.CompletionOptions.DisableDefaultCmd = true
 	pf := cmd.PersistentFlags()
 	pf.StringVarP(&root.adapter, "adapter", "i", "hci0", "HCI adapter name (e.g. hci0)")
 	pf.StringVarP(&root.bdaddr, "bdaddr", "b", "", "remote BD_ADDR (XX:XX:XX:XX:XX:XX)")
@@ -103,6 +106,7 @@ mtu --set/--reset) require root.`
 		newDoctorCmd(), newAdapterCmd(), newDisconnectCmd(), newForgetCmd(),
 		newBdaddrCmd(), newMonitorCmd(), newRawWriteCmd(),
 	)
+	cmd.AddCommand(newCompletionCmd()) // ungrouped (Additional Commands)
 	return cmd
 }
 

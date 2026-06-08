@@ -9,31 +9,33 @@ import (
 	"caeruleus/internal/bluez"
 )
 
-var authBypassFlags struct {
+var checkAuthFlags struct {
 	probeWrite bool
 }
 
-func newAssessAuthBypassCmd() *cobra.Command {
+func newAssessCheckAuthCmd() *cobra.Command {
 	c := &cobra.Command{
-		Use:   "auth-bypass",
-		Short: "What an unpaired attacker can read (and optionally write) on -b BDADDR",
+		Use:     "check-auth",
+		Aliases: []string{"auth-bypass"},
+		Short:   "What an unpaired attacker can read (and optionally write) on -b BDADDR",
 		Long: `Drops any existing bond, connects unauthenticated, and attempts to read
 every characteristic - classifying each as readable-without-auth,
-auth-required, denied, or error. Values that look like secrets
-(passwords, tokens, keys, flags) are escalated.
+auth-required, denied, or error. Read values are scanned with Praetorian
+Titus; a value that matches a secret rule (API key, token, private key, ...)
+is escalated to high.
 
 By default this is read-only and safe. With --probe-write it also writes
 each characteristic's just-read value back to itself to test whether writes
 are accepted without authentication; that is minimally invasive (same bytes)
 but still exercises the write path, so it is opt-in.`,
-		RunE: runAuthBypass,
+		RunE: runCheckAuth,
 	}
-	c.Flags().BoolVar(&authBypassFlags.probeWrite, "probe-write", false,
+	c.Flags().BoolVar(&checkAuthFlags.probeWrite, "probe-write", false,
 		"also test writes by writing each readable value back to itself (opt-in; exercises the write path)")
 	return c
 }
 
-func runAuthBypass(cmd *cobra.Command, args []string) error {
+func runCheckAuth(cmd *cobra.Command, args []string) error {
 	addr, err := requireBdaddr()
 	if err != nil {
 		return err
@@ -54,7 +56,7 @@ func runAuthBypass(cmd *cobra.Command, args []string) error {
 	}
 	defer s.close()
 
-	res := assessResult{Address: addr, Test: "auth-bypass"}
+	res := assessResult{Address: addr, Test: "check-auth"}
 	var readOK, authReq, denied, writeOK int
 
 	chars := append([]bluez.GattObject(nil), s.tree.Characteristics...)
@@ -74,17 +76,20 @@ func runAuthBypass(cmd *cobra.Command, args []string) error {
 				readOK++
 				lastValue = v
 				sev := SevLow
-				ascii := asciiize(v)
-				if looksSensitive(ascii) {
+				title := "Characteristic readable without authentication"
+				detail := "Value retrieved over an unpaired, unencrypted link."
+				if rule, ok := detectSecret(v); ok {
 					sev = SevHigh
+					title = "Secret readable without authentication"
+					detail = fmt.Sprintf("Titus matched rule %q; value read over an unpaired, unencrypted link.", rule)
 				}
 				res.Findings = append(res.Findings, Finding{
-					Title:    "Characteristic readable without authentication",
+					Title:    title,
 					Severity: sev,
 					Handle:   ch.Handle,
 					UUID:     ch.UUID,
 					Evidence: preview,
-					Detail:   "Value retrieved over an unpaired, unencrypted link.",
+					Detail:   detail,
 				})
 			case accessAuth:
 				authReq++
@@ -94,7 +99,7 @@ func runAuthBypass(cmd *cobra.Command, args []string) error {
 		}
 
 		// --- write-back probe (opt-in) ---
-		if authBypassFlags.probeWrite && canWrite && lastValue != nil {
+		if checkAuthFlags.probeWrite && canWrite && lastValue != nil {
 			wt := bluez.WriteRequest
 			if !propsCan(ch.Flags, "write") {
 				wt = bluez.WriteCommand

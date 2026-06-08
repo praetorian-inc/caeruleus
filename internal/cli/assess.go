@@ -5,8 +5,11 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/jedib0t/go-pretty/v6/table"
+	"github.com/jedib0t/go-pretty/v6/text"
+	"github.com/praetorian-inc/titus"
 	"github.com/spf13/cobra"
 
 	"caeruleus/internal/bluez"
@@ -66,7 +69,7 @@ pair / listen primitives into a single deterministic pass and emit structured
 findings (use -o json for the skill / report layer).
 
 Subcommands:
-  auth-bypass   what an unpaired attacker can read (and optionally write)
+  check-auth    what an unpaired attacker can read (and optionally write)
   encryption    whether pairing changes what is exposed (enforcement / fallback)
   wwr           write-without-response overflow + rapid-fire resilience
   dfu           detect a DFU service and whether entry is unauthenticated
@@ -75,7 +78,7 @@ Findings are data, not command failure: these exit 0 even when issues are
 found. See 'caeruleus recon' for the passive profile + GATT audit.`,
 	}
 	c.AddCommand(
-		newAssessAuthBypassCmd(),
+		newAssessCheckAuthCmd(),
 		newAssessEncryptionCmd(),
 		newAssessWWRCmd(),
 		newAssessDFUCmd(),
@@ -123,17 +126,40 @@ func containsAnyLower(s string, subs ...string) bool {
 	return false
 }
 
-// looksSensitive flags decoded values that resemble secrets, so a plain
-// readable characteristic can be escalated above informational.
-func looksSensitive(ascii string) bool {
-	l := strings.ToLower(ascii)
-	for _, k := range []string{"pass", "passwd", "password", "secret", "token",
-		"admin", "cred", "flag{", "ble{", "apikey", "api_key", "bearer", "privkey", "private"} {
-		if strings.Contains(l, k) {
-			return true
+// secret detection is backed by Praetorian Titus, which carries ~500 rules
+// for structured secrets (API keys, tokens, private keys). The scanner loads
+// its rule set once and is reused for the life of the process.
+var (
+	secretScannerOnce sync.Once
+	secretScanner     *titus.Scanner
+)
+
+func secretDetector() *titus.Scanner {
+	secretScannerOnce.Do(func() {
+		s, err := titus.NewScanner()
+		if err != nil {
+			logf("titus scanner init failed; secret detection disabled: %v", err)
+			return
 		}
+		secretScanner = s
+	})
+	return secretScanner
+}
+
+// detectSecret runs a characteristic value through Titus and returns the name
+// of the first matching rule, or ("", false) when nothing matches or the
+// scanner is unavailable. Titus targets structured secrets (keys/tokens), not
+// arbitrary password-like text, so a finding here is high-confidence.
+func detectSecret(value []byte) (string, bool) {
+	s := secretDetector()
+	if s == nil || len(value) == 0 {
+		return "", false
 	}
-	return false
+	matches, err := s.ScanBytes(value)
+	if err != nil || len(matches) == 0 {
+		return "", false
+	}
+	return matches[0].RuleName, true
 }
 
 // isSIGBaseUUID reports whether a 128-bit UUID is in the Bluetooth SIG base
@@ -167,15 +193,28 @@ func (s *session) charByHandle(h uint16) *bluez.Characteristic {
 	return nil
 }
 
-// charValuePreview reads a characteristic and returns a compact
-// "hex (\"ascii\")" preview for use as finding evidence.
+// charValuePreview reads a characteristic and returns a "hex (\"ascii\")"
+// rendering of the value for use as finding evidence, plus the raw bytes.
 func charValuePreview(c *bluez.Characteristic) (string, []byte, error) {
 	v, err := c.ReadValue(0)
 	if err != nil {
 		return "", nil, err
 	}
-	hexs := truncate(fmt.Sprintf("%x", v), 64)
-	return fmt.Sprintf("%s (%q)", hexs, truncate(asciiize(v), 32)), v, nil
+	return valuePreview(v), v, nil
+}
+
+// valuePreview renders bytes as evidence. Values up to previewCap bytes are
+// shown in full (so credentials / tokens / PII are never cut); longer blobs
+// show the first previewCap bytes with a "+N bytes" note rather than dumping
+// hundreds of hex characters into a table cell.
+func valuePreview(v []byte) string {
+	const previewCap = 64
+	shown, suffix := v, ""
+	if len(v) > previewCap {
+		shown = v[:previewCap]
+		suffix = fmt.Sprintf(" +%d bytes", len(v)-previewCap)
+	}
+	return fmt.Sprintf("%x (%q)%s", shown, asciiize(shown), suffix)
 }
 
 // --- shared output ------------------------------------------------------
@@ -207,6 +246,34 @@ func emitAssess(res assessResult) error {
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
 	t.AppendHeader(table.Row{"SEV", "HANDLE", "UUID", "FINDING", "EVIDENCE"})
+
+	// On a terminal, bound the wrappable columns so the box fits the width.
+	// Evidence is never truncated - it is the point of the finding - so when
+	// space is tight the FINDING (title) and UUID columns wrap instead, and
+	// evidence gets the larger share of what remains. Piped output (width 0)
+	// is left unconstrained so evidence stays on one line for grep.
+	if w := termWidth(); w > 0 {
+		avail := w - 35 // SEV(8) + HANDLE(8) + 5-column decoration(17), with margin
+		if avail < 24 {
+			avail = 24
+		}
+		uuidW := avail * 18 / 100
+		if uuidW < 8 {
+			uuidW = 8
+		} else if uuidW > 20 {
+			uuidW = 20
+		}
+		rem := avail - uuidW
+		evidenceW := rem * 3 / 5 // evidence prioritised over the finding text
+		findingW := rem - evidenceW
+		t.SetColumnConfigs([]table.ColumnConfig{
+			{Number: 3, WidthMax: uuidW, WidthMaxEnforcer: text.WrapText},
+			{Number: 4, WidthMax: findingW, WidthMaxEnforcer: text.WrapText},
+			{Number: 5, WidthMax: evidenceW, WidthMaxEnforcer: text.WrapText},
+		})
+		t.SetAllowedRowLength(w)
+	}
+
 	for _, f := range res.Findings {
 		h := ""
 		if f.Handle != 0 {
@@ -215,9 +282,9 @@ func emitAssess(res assessResult) error {
 		t.AppendRow(table.Row{
 			strings.ToUpper(string(f.Severity)),
 			h,
-			truncate(f.UUID, 36),
+			shortUUID(f.UUID),
 			f.Title,
-			truncate(f.Evidence, 40),
+			f.Evidence,
 		})
 	}
 	t.Render()

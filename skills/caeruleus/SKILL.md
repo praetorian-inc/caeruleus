@@ -1,67 +1,45 @@
 ---
 name: caeruleus
 description: Use when performing hardware-agnostic BLE security testing on Linux/BlueZ - device scanning, GATT enumeration, read/write/notify interaction, fuzzing, and security assessment (unauthenticated read/write exposure, encryption enforcement, DFU entry, write-without-response abuse, connection parameters). Drives the single Go `caeruleus` binary; no separate server process, no external tool wrapping.
-compatibility: Linux with BlueZ (bluetoothd) and a standard BLE adapter; build with the Go toolchain (1.25+). Some commands require root (raw HCI/L2CAP sockets). Harness-agnostic - usable from any Agent Skills-compatible agent.
+compatibility: Linux with BlueZ (bluetoothd) and a standard BLE adapter. Ships as a single self-contained `caeruleus` binary; some commands need root (raw HCI/L2CAP). Harness-agnostic - usable from any Agent Skills-compatible agent.
 allowed-tools: Bash Read
 ---
 
-# Caeruleus BLE Security Testing (Go)
+# Caeruleus BLE Security Testing
 
-**A single statically-linked Go binary (`caeruleus`) that talks to BLE peripherals through BlueZ D-Bus and raw L2CAP/HCI sockets. Every subcommand supports `-o json` for machine consumption.** This skill is the orchestration layer: it sequences the binary's commands into assessment workflows and correlates their JSON findings into a report.
+**`caeruleus` is a single Go binary that talks to BLE peripherals over BlueZ D-Bus and raw L2CAP/HCI sockets.** Every subcommand takes `-b <BDADDR>` and supports `-o json`. This skill drives that binary: pick the command for the task, and for an assessment, chain the `recon` / `assess` / `conn-params` commands and correlate their JSON findings into a report.
 
-Scope is deliberately **hardware-agnostic and self-contained**: it needs only a standard BLE adapter and BlueZ. It does not require Python, a separate server process, sniffer hardware, or an ESP32 relay, and it never shells out to other tools.
+It is hardware-agnostic and self-contained - just a BLE adapter and BlueZ. No Python, no separate server, no sniffer/relay hardware, and it never shells out to other tools. (Off-path sniffing of other devices and MITM/peripheral-clone work are out of scope - use dedicated hardware for those.)
 
-## When to Use
+## Setup
 
-- Interacting with a BLE peripheral: scan, enumerate GATT, read/write characteristics, subscribe to notifications.
-- Assessing a peripheral's security posture: what an unpaired attacker can read/write, whether encryption is enforced, DFU exposure, write-without-response resilience, connection parameters.
-- Fuzzing a writable characteristic for crashes/hangs (with an on-disk corpus).
-- Recovering a wedged adapter / stuck BlueZ connection during testing.
+Use the provided `caeruleus` release binary: put it on `PATH` (e.g. `sudo install -m755 caeruleus /usr/local/bin/`) and run `caeruleus`. You need Linux with `bluetoothd` running and an adapter (default `hci0`); `caeruleus doctor` checks this.
 
-If the task needs off-path sniffing of *other* devices' traffic, or a MITM relay/peripheral clone, that is out of scope for this tool - use dedicated sniffer/relay hardware separately.
+A few commands need **root** (raw HCI/L2CAP or system config): `conn-params`, `monitor`, `fuzz write --raw`, `cccd --raw`, `raw-write`, `mtu --set/--reset`, `bdaddr --set`. Run those with `sudo caeruleus …`; for unattended use, a scoped sudoers drop-in (`"$USER ALL=(root) NOPASSWD: $(command -v caeruleus)"` in `/etc/sudoers.d/caeruleus`) avoids prompts.
 
-## Prerequisites & Build
+> Building from source is only needed if you weren't given a binary: `make build` at the repo root produces `./caeruleus`.
 
-- **Linux with BlueZ** (`bluetoothd` running) and a BLE adapter (default `hci0`).
-- **Go toolchain** (1.25+) to build, or a prebuilt binary.
-
-Build once from the repo root:
+## Common tasks
 
 ```bash
-make build          # produces ./caeruleus  (and: make harness, make test-unit)
+A=AA:BB:CC:DD:EE:FF                 # target (from: caeruleus scan)
+
+caeruleus scan                       # discover devices (names, addr type, RSSI)
+caeruleus enumerate -b $A --values   # full GATT tree + read each value
+caeruleus read  -b $A -a 0x0013      # read a handle (or -u <uuid>)
+caeruleus write -b $A -a 0x0015 -s "hello"      # write a string (-n for hex)
+caeruleus listen -b $A -a 0x001e --duration 10s # capture notifications
+
+caeruleus recon -b $A                # device profile + GATT audit (fingerprint)
+caeruleus assess check-auth -b $A    # what an unpaired attacker can read
+caeruleus pair -b $A                 # pair/bond; caeruleus unpair -b $A to drop it
+caeruleus assess dfu -b $A           # detect a DFU service + unauthenticated entry
+
+caeruleus shell -b $A                # interactive REPL against one device
+caeruleus doctor                     # adapter / bluetoothd health check
 ```
 
-Invoke as `./caeruleus` from the repo root, or copy it onto `PATH`. In examples below the binary is written `caeruleus`.
-
-### Root / privileges
-
-Most commands run unprivileged over D-Bus. These need **root** (raw HCI/L2CAP or system config):
-
-| Needs root | Why |
-|---|---|
-| `conn-params`, `monitor` | HCI monitor socket (CAP_NET_RAW + CAP_NET_ADMIN) |
-| `fuzz write --raw`, `cccd --raw`, `raw-write` | raw L2CAP ATT socket (CAP_NET_RAW) |
-| `mtu --set/--reset`, `bdaddr --set` | edits system config / vendor HCI commands |
-
-Run those with `sudo caeruleus …`. For unattended runs, a scoped sudoers drop-in avoids prompts:
-
-```bash
-echo "$USER ALL=(root) NOPASSWD: $(command -v caeruleus || echo $PWD/caeruleus)" | sudo tee /etc/sudoers.d/caeruleus
-sudo chmod 0440 /etc/sudoers.d/caeruleus
-```
-
-(Remove with `sudo rm /etc/sudoers.d/caeruleus`. Note this grants passwordless root to that binary path.)
-
-## Global flags
-
-Apply to every subcommand:
-
-- `-b, --bdaddr XX:XX:XX:XX:XX:XX` - target peripheral (required by most commands).
-- `-i, --adapter hciN` - adapter (default `hci0`).
-- `--addr-type public|random` - force address type (auto if blank; some peripherals advertise as `random`).
-- `-t, --timeout N` - per-operation timeout, seconds (default 25).
-- `-o, --format text|json|jsonl` - **always use `json` when orchestrating**; `text` renders human tables.
-- `-v, --verbose` / `-q, --quiet` - stderr diagnostics / suppress status lines.
+Add `-o json` to any command to get machine-readable output for scripting or reporting.
 
 ## Command reference
 
@@ -69,9 +47,8 @@ Apply to every subcommand:
 | Command | Purpose |
 |---|---|
 | `scan [-t secs]` | LE discovery; `--new` hides cached devices. |
-| `recon -b A` | Passive device profile (DIS fingerprint, service map, GATT audit). |
-| `enumerate -b A [--values] [--compact]` | Full GATT tree; `--compact` is one line/char (LLM-friendly). |
-| `primary -b A` / `characteristics -b A` | gatttool-compatible service / characteristic listing. |
+| `enumerate -b A [--values] [--compact]` | Full GATT tree; `--values` reads each characteristic; `--compact` is one line/char. |
+| `primary -b A` / `characteristics -b A` | gatttool-style service / characteristic listing. |
 | `read -b A (-a 0xHND \| -u UUID) [--watch --every D] [--extract]` | Read; `--extract` emits bare hex for piping. |
 | `write -b A (-a 0xHND\|-u UUID) (-n HEX \| -s STR) [--req] [--each-line]` | Write; `--req` forces write-with-response. |
 | `listen -b A -a 0xHND [--trigger-value HEX] [--duration D]` | Subscribe to notifications/indications. |
@@ -80,71 +57,76 @@ Apply to every subcommand:
 | `shell -b A` / `batch -b A` / `serve`+`send` | Interactive REPL / stdin script / persistent warm-link daemon. |
 
 ### Security assessment (structured findings)
-All emit `{address, test, summary, findings[]}`; findings carry `severity` (info/low/medium/high/critical), `handle`, `uuid`, `evidence`, `detail`. **These exit 0 even when issues are found** - findings are data.
+All emit `{address, test, summary, findings[]}`; findings carry `severity` (info/low/medium/high/critical), `handle`, `uuid`, `evidence`, `detail`. **They exit 0 even when issues are found** - findings are data.
 
 | Command | What it tests |
 |---|---|
 | `recon -b A` | Fingerprint + audit: DFU presence, exposed serial, custom services, hidden-readable characteristics. |
-| `assess auth-bypass -b A [--probe-write]` | What an unpaired attacker can read; secret-looking values escalate. `--probe-write` also tests unauthenticated writes (same-value write-back). |
-| `assess encryption -b A` | Unauthenticated baseline → pair → re-test: no-pairing exposure, enforcement, legacy fallback after unpair. |
+| `assess check-auth -b A [--probe-write]` | What an unpaired attacker can read; values are scanned with Titus and a secret match escalates to high. `--probe-write` also tests unauthenticated writes (same-value write-back). |
+| `assess encryption -b A` | Unauthenticated baseline, pair, re-test: no-pairing exposure, enforcement, legacy fallback after unpair. |
 | `assess dfu -b A [--probe-entry]` | Detect 0xFE59 DFU + unauthenticated buttonless entry. `--probe-entry` is **destructive** (reboots target). |
-| `assess wwr -b A [--sizes ...] [--burst N]` | Write-without-response overflow sweep + rapid-fire burst with liveness probe (can crash a fragile target). |
+| `assess wwr -b A [--sizes ...] [--burst N]` | Write-without-response overflow sweep + rapid-fire burst with a liveness probe (can crash a fragile target). |
 | `pair -b A` / `unpair -b A` | Establish / drop a bond (pairing rejection is recorded, not an error). |
 | `conn-params -b A` | Connection interval / peripheral latency / supervision timeout + ATT MTU (root). |
+
+`check-auth` and `recon` use the Praetorian [Titus](https://github.com/praetorian-inc/titus) rule set to flag values that are structured secrets (API keys, tokens, private keys). Plain credential-looking text (e.g. `user:pass`) is reported as readable-without-auth but not auto-escalated.
 
 ### Fuzzing
 | Command | Purpose |
 |---|---|
-| `fuzz write -b A -a 0xHND [--type req\|cmd\|both] [--max-iter N] [--max-time D]` | Write fuzzing with an on-disk corpus and crash/hang triage. Output dir `fuzz-out-<ts>/`. |
-| `fuzz write … --raw [--include prep,exec]` | Drive raw L2CAP solo (oversized single-PDU + Prepare/Execute writes); root. |
-| `fuzz write … --target-reset "CMD" [--liveness-every N]` | Run a recovery shell command when the target wedges. |
-| `fuzz replay DIR/file [--op req\|cmd]` | Re-send a saved corpus/crash input to reproduce. |
+| `fuzz write -b A -a 0xHND [--type req\|cmd\|both] [--max-iter N] [--max-time D]` | Fuzz writes with an on-disk corpus and crash/hang triage. Output dir `fuzz-out-<ts>/`. |
+| `fuzz write … --raw [--include prep,exec]` | Drive raw L2CAP (oversized single-PDU + multi-part writes); root. |
+| `fuzz write … --target-reset "CMD"` | Run a recovery shell command when the target wedges. |
+| `fuzz replay DIR/file` | Re-send a saved corpus/crash input to reproduce. |
 
 ### Adapter & diagnostics
 | Command | Purpose |
 |---|---|
-| `doctor` | One-shot health check (bluetoothd, power, scan, MTU, address) with fixes; exit 2 on FAIL. |
+| `doctor` | One-shot health check (bluetoothd, power, scan, MTU, address); exit 2 on FAIL. |
 | `adapter power on\|off\|cycle` / `adapter info` | Soft adapter recovery / state. |
 | `disconnect -b A` / `forget -b A` | Drop link / purge BlueZ cache (clears stuck `Connected=true`). |
 | `bdaddr --show` / `--set MAC` | Read / spoof adapter BD_ADDR (root; vendor-specific). |
 | `monitor -b A [--handle 0xHND]` | Passive HCI decode of notifications BlueZ hides (root). |
 
-## Assessment methodology (recommended orchestration)
+## Global flags
 
-Run in order, capturing each step's JSON, then synthesize. Reuse one warm link where possible; if a step wedges the device, run `disconnect`/`forget` or `adapter power cycle` before continuing.
+`-b/--bdaddr` target, `-i/--adapter hciN` (default `hci0`), `--addr-type public|random` (force if a connect fails), `-t/--timeout N` seconds, `-o/--format text|json|jsonl`, `-v/--verbose`, `-q/--quiet`.
+
+## Assessment methodology
+
+Run in order, capturing each step's JSON, then synthesize. If a step wedges the device, run `disconnect` / `forget` or `adapter power cycle` before continuing.
 
 ```bash
-A=CC:B6:0E:3C:97:0B          # target
+A=AA:BB:CC:DD:EE:FF
 
 caeruleus doctor -o json                                   # 0. adapter sane?
-caeruleus recon              -b $A -o json > recon.json     # 1. profile + audit
-caeruleus assess auth-bypass -b $A -o json > auth.json      # 2. unauth read exposure
-caeruleus assess encryption  -b $A -o json > enc.json       # 3. encryption enforcement
-caeruleus assess dfu         -b $A -o json > dfu.json       # 4. DFU exposure (detect-only)
-sudo caeruleus conn-params   -b $A -o json > conn.json      # 5. timing profile
-# 6. (optional, can crash) write-without-response resilience:
-caeruleus assess wwr         -b $A -o json > wwr.json
-# 7. (optional, deep) fuzz a writable characteristic found above:
-caeruleus fuzz write -b $A -a 0x0015 --max-time 2m
+caeruleus recon             -b $A -o json > recon.json      # 1. profile + audit
+caeruleus assess check-auth -b $A -o json > checkauth.json  # 2. unauth read exposure
+caeruleus assess encryption -b $A -o json > enc.json        # 3. encryption enforcement
+caeruleus assess dfu        -b $A -o json > dfu.json        # 4. DFU exposure (detect-only)
+sudo caeruleus conn-params  -b $A -o json > conn.json       # 5. timing profile
+caeruleus assess wwr        -b $A -o json > wwr.json         # 6. optional, can crash
+# 7. optional deep dive: fuzz a writable characteristic found above
+caeruleus fuzz write -b $A -a 0xHND --max-time 2m
 ```
 
-Then **correlate**: merge all `findings[]`, dedupe by `(uuid, title)`, rank by severity, and chain related findings into attack narratives (e.g. *auth-bypass read of a credentials characteristic* + *no encryption enforced* = unauthenticated credential disclosure). Use `recon`'s `profile` (manufacturer/model/firmware/serial) for chipset/CVE correlation and report context. Produce a Markdown report grouped by severity with evidence (`evidence` is a hex+ASCII preview) and remediation per finding type (enforce pairing/encryption, tighten permissions, authenticate DFU, validate write lengths).
+Then **correlate**: merge all `findings[]`, dedupe by `(uuid, title)`, rank by severity, and chain related findings into attack narratives (e.g. *a secret read by check-auth* + *no encryption enforced* = unauthenticated secret disclosure). Use `recon`'s `profile` (manufacturer/model/firmware/serial) for chipset/CVE context. Produce a Markdown report grouped by severity, with each finding's `evidence`, and remediation per type (enforce pairing/encryption, tighten permissions, authenticate DFU, validate write lengths).
 
 ## Findings JSON schema
 
 ```jsonc
 {
-  "address": "CC:B6:0E:3C:97:0B",
-  "test": "auth-bypass",
+  "address": "AA:BB:CC:DD:EE:FF",
+  "test": "check-auth",
   "summary": "readable-unauth=16 auth-required=0 ...",
   "findings": [
     {
-      "title": "Characteristic readable without authentication",
+      "title": "Secret readable without authentication",
       "severity": "high",                 // info|low|medium|high|critical
-      "handle": 19,                        // ATT handle (decimal in JSON)
-      "uuid": "00ca0001-bede-ad43-4145-52554c455500",
-      "evidence": "61646d696e... (\"admin:password123\")",
-      "detail": "Value retrieved over an unpaired, unencrypted link."
+      "handle": 21,                        // ATT handle (decimal in JSON)
+      "uuid": "00ca0002-bede-ad43-4145-52554c455500",
+      "evidence": "...hex... (\"...ascii...\")",
+      "detail": "Titus matched rule \"...\"; value read over an unpaired link."
     }
   ]
 }
@@ -154,8 +136,8 @@ Then **correlate**: merge all `findings[]`, dedupe by `(uuid, title)`, rank by s
 
 ## Operational notes
 
-- **Random vs public addresses:** if connect fails, pass `--addr-type random` (or `public`). `scan` shows each device's type.
-- **Stuck state:** "Operation already in progress" / `Connected=true` that won't clear → `caeruleus forget -b A` then retry, or `caeruleus adapter power cycle`. `caeruleus doctor` suggests the fix.
-- **Single-connection peripherals:** many small devices accept one central at a time. Disconnect (the tool does this on exit) before re-running, or use `serve`/`send` to hold one warm link across many operations.
-- **Pairing rejection is a result,** not a failure: `pair`/`assess encryption` exit 0 and record it.
+- **Random vs public addresses:** if a connect fails, pass `--addr-type random` (or `public`). `scan` shows each device's type.
+- **Stuck state:** "Operation already in progress" / `Connected=true` that won't clear -> `caeruleus forget -b A` then retry, or `caeruleus adapter power cycle`. `doctor` suggests the fix.
+- **Single-connection peripherals:** many small devices accept one central at a time. The tool disconnects on exit; for many sequential operations use `serve` + `send` to hold one warm link.
+- **Pairing rejection is a result,** not a failure: `pair` / `assess encryption` exit 0 and record it.
 - **`assess wwr` and `assess dfu --probe-entry` are active/destructive** - only run against targets you can recover (they may reset the device).
