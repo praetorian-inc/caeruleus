@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -8,6 +9,46 @@ import (
 
 	"caeruleus/internal/bluez"
 )
+
+// pairAttempt captures the outcome of one connect+Pair cycle. pairErr is the
+// peer-side result (nil = accepted; non-nil = rejected/unsupported, which is
+// data, not a tool failure). A connect failure is returned as the error.
+type pairAttempt struct {
+	paired  bool
+	bonded  *bool // nil when BlueZ doesn't expose the Bonded property
+	pairErr error
+}
+
+// attemptPair brings up the link to addr, invokes Device1.Pair, records the
+// resulting Paired/Bonded state, then disconnects (the bond persists). The
+// returned error is non-nil only when the device could not be reached.
+func attemptPair(ctx context.Context, addr string) (pairAttempt, error) {
+	conn, err := bluez.Dial(root.adapter)
+	if err != nil {
+		return pairAttempt{}, err
+	}
+	defer conn.Close()
+
+	dev := conn.Device(addr)
+	if root.addrType != "" {
+		_ = dev.SetAddressType(root.addrType)
+	}
+	if err := dev.Connect(ctx, time.Duration(root.timeout)*time.Second); err != nil {
+		return pairAttempt{}, fmt.Errorf("connect before pair: %w", err)
+	}
+	defer func() {
+		if c, e := dev.Connected(); e == nil && c {
+			_ = dev.Disconnect()
+		}
+	}()
+
+	pa := pairAttempt{pairErr: dev.Pair()}
+	pa.paired, _ = dev.Paired()
+	if b, e := dev.Bonded(); e == nil {
+		pa.bonded = &b
+	}
+	return pa, nil
+}
 
 // pairResult is the structured output of `pair` / `unpair`.
 type pairResult struct {
@@ -61,47 +102,25 @@ func runPair(cmd *cobra.Command, args []string) error {
 	ctx, cancel := ctxWithRootTimeout()
 	defer cancel()
 
-	conn, err := bluez.Dial(root.adapter)
+	pa, err := attemptPair(ctx, addr)
 	if err != nil {
-		return err
+		return err // could not reach the device — a real error
 	}
-	defer conn.Close()
 
-	dev := conn.Device(addr)
-	if root.addrType != "" {
-		_ = dev.SetAddressType(root.addrType)
-	}
-	// Bring the link up first: this both registers the Device1 object and
-	// gives Pair an active connection. A connect failure here is a real
-	// error (we never reached the peer); a Pair failure below is data.
-	if err := dev.Connect(ctx, time.Duration(root.timeout)*time.Second); err != nil {
-		return fmt.Errorf("connect before pair: %w", err)
-	}
-	defer func() {
-		if c, e := dev.Connected(); e == nil && c {
-			_ = dev.Disconnect()
-		}
-	}()
-
-	pairErr := dev.Pair()
-	paired, _ := dev.Paired()
-	res := pairResult{Address: addr, Action: "pair", Paired: paired}
-	if b, e := dev.Bonded(); e == nil {
-		res.Bonded = &b
-	}
-	if pairErr != nil {
-		res.Error = pairErr.Error()
+	res := pairResult{Address: addr, Action: "pair", Paired: pa.paired, Bonded: pa.bonded}
+	if pa.pairErr != nil {
+		res.Error = pa.pairErr.Error()
 	}
 
 	if formatIsJSON() {
 		return emitJSON(res)
 	}
-	if pairErr != nil {
-		failf("pair %s rejected/unsupported: %v", addr, pairErr)
+	if pa.pairErr != nil {
+		failf("pair %s rejected/unsupported: %v", addr, pa.pairErr)
 	} else {
 		statusf("pair %s ok", addr)
 	}
-	fmt.Printf("address=%s action=pair paired=%v", addr, paired)
+	fmt.Printf("address=%s action=pair paired=%v", addr, pa.paired)
 	if res.Bonded != nil {
 		fmt.Printf(" bonded=%v", *res.Bonded)
 	}
