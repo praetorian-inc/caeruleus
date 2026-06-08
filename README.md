@@ -1,176 +1,78 @@
 # Caeruleus
 
-NOTE: VERY EARLY STATE, SEVERAL FEATURES STILL UNTESTED. TALK TO AARON BEFORE USE
+Caeruleus is a hardware-agnostic BLE security testing toolkit for Linux/BlueZ, implemented as a single Go binary (`caeruleus`). It covers the full interaction-to-assessment lifecycle - scan, enumerate, read/write/notify, fuzzing, and structured security assessment - talking to peripherals directly over BlueZ D-Bus and raw L2CAP/HCI sockets. A portable [Agent Skill](https://agentskills.io) (`skills/caeruleus/`) orchestrates the binary's `-o json` output into assessment workflows and reports, and works with any Agent Skills-compatible agent.
 
-Caeruleus is a BLE security testing toolkit implemented as a [Claude Code](https://docs.anthropic.com/en/docs/claude-code) skill plugin — TypeScript scripts backed by a persistent Python server ([bleak](https://bleak.readthedocs.io/)) cover the full assessment lifecycle: recon, analysis, attack, and reporting. An AI agent orchestrates the tools against a target device through a shared YAML IPC client.
+*caeruleus* - Latin for "blue"
 
-*caeruleus* — Latin for "blue"
+> The earlier proof-of-concept (a TypeScript + persistent-Python-server skill) has been superseded by this Go implementation. It remains recoverable in git history.
 
 ## Architecture
 
 ```
-Claude Code Agent
-    │
-    ▼
-TypeScript CLI Wrappers (skills/caeruleus/*.ts)
-    │ stdin/stdout YAML IPC
-    ▼
-Persistent Python Server (caeruleus-server.py)
-    │
-    ▼
-bleak → CoreBluetooth (macOS) / BlueZ (Linux)
-
-Optional:
-  caeruleus-sniffer.py → Ubertooth / nRF52 / Sniffle
-  ESP32-Gattacker      → MITM relay via WebSocket
+AI agent (Agent Skills)  ──drives──►  caeruleus skill (skills/caeruleus/SKILL.md)
+                                      │  shells out, consumes -o json
+                                      ▼
+                         caeruleus (Go binary, this repo)
+                          ├─ BlueZ D-Bus  (Adapter1/Device1/GattCharacteristic1)
+                          ├─ raw L2CAP ATT socket (CID 0x0004) - root
+                          └─ HCI monitor socket (btmon channel) - root
 ```
 
-The Python server is **persistent** — it stays alive across multiple commands within a session, reusing the BLE connection. First call takes ~2-4s (adapter init + connection), subsequent calls ~50-200ms.
+No Python, no MCP server, no sniffer/relay hardware, and no shelling out to other tools.
 
-### Raw ATT Operations (Linux only)
+## Layout
 
-Two server commands bypass Bleak's D-Bus layer to operate directly on L2CAP ATT sockets:
+```
+caeruleus/
+├── cmd/caeruleus/        # main entrypoint (binary: caeruleus)
+├── cmd/shell-harness/    # pty-driven tester for the interactive shell
+├── internal/
+│   ├── cli/              # cobra command tree (one file per command group)
+│   ├── bluez/            # hand-rolled BlueZ D-Bus wrapper
+│   ├── l2cap/            # raw L2CAP ATT socket
+│   ├── hcimon/           # HCI monitor decode (notifications + connection params)
+│   ├── bdaddr/           # adapter BD_ADDR read/spoof (vendor HCI)
+│   └── fuzz/             # fuzzing: mutation engine, corpus, crash/hang triage
+├── skills/caeruleus/     # the Go-driven Agent Skill (portable; agentskills.io format)
+└── docs/                 # fuzzing-plan.md, ux-improvements.md
+```
 
-- **`subscribe_raw`** — Opens a raw L2CAP ATT socket, optionally writes a trigger value (CCCD enable), and captures ATT Notification (0x1B) and Indication (0x1D) PDUs. Essential for devices that lack CCCD descriptors where Bleak's `start_notify` fails.
-- **`raw_att`** — General-purpose raw ATT operations: `exchange_mtu`, `read`, `write`, `listen`. Enables MTU negotiation and reading/writing handles not present in Bleak's GATT cache (e.g., GAP service attributes hidden by BlueZ).
-
-## Skill Scripts
-
-### Phase 1: Reconnaissance
-
-| Script | Purpose |
-|---|---|
-| `scan-devices.ts` | Discover BLE devices in range |
-| `enumerate-gatt.ts` | Map GATT services, characteristics, descriptors |
-| `probe-characteristics.ts` | Test actual read/write permissions |
-| `fingerprint-device.ts` | Identify chipset, firmware, manufacturer |
-| `analyze-advertisements.ts` | Decode advertisement and manufacturer data |
-
-### Phase 2: Protocol Analysis
-
-| Script | Purpose |
-|---|---|
-| `test-pairing.ts` | Test pairing enforcement and methods |
-| `test-encryption.ts` | Test encryption requirements per characteristic |
-| `subscribe-notifications.ts` | Monitor notifications and indications (supports `raw: true` for CCCD-less devices) |
-| `subscribe-raw.ts` | Raw L2CAP ATT notification/indication capture (Linux, bypasses Bleak) |
-| `audit-gatt-profile.ts` | Audit GATT profile against BLE spec |
-| `sniff-decode.ts` | Capture and decode BLE packets |
-| `analyze-connection-params.ts` | Analyze connection parameters |
-
-### Phase 3: Active Testing
-
-| Script | Purpose |
-|---|---|
-| `fuzz-characteristic.ts` | Fuzz writable characteristics for crashes |
-| `test-wwr-abuse.ts` | Write-without-response overflow and rapid-fire |
-| `test-auth-bypass.ts` | Test post-unpair and unauthenticated access |
-| `replay-writes.ts` | Replay captured write sequences |
-| `test-dfu.ts` | Test Nordic DFU firmware update security |
-| `mitm-relay.ts` | MITM relay via ESP32-Gattacker |
-| `spoof-notifications.ts` | Spoof notification values via MITM |
-| `generate-fuzz-harness.ts` | Generate fuzz test harness from GATT map |
-
-### Phase 4: Reporting
-
-| Script | Purpose |
-|---|---|
-| `visualize-gatt.ts` | Generate GATT hierarchy visualization |
-| `correlate-findings.ts` | Correlate findings across phases |
-| `map-cves.ts` | Map chipset to known CVEs |
-| `assemble-evidence.ts` | Assemble evidence package |
-| `generate-remediation.ts` | Generate remediation guidance |
-| `generate-report.ts` | Generate final security report |
-
-### Standalone Utilities
-
-| Script | Purpose |
-|---|---|
-| `read-characteristic.ts` | Read a single characteristic value |
-| `write-characteristic.ts` | Write to a single characteristic |
-| `batch-read.ts` | Read multiple characteristics in one session |
-| `batch-write.ts` | Write to multiple characteristics with optional read-after-write |
-| `shutdown-server.ts` | Gracefully stop the server (disconnects BLE before exiting) |
-
-## Prerequisites
-
-- **Python 3.10+** with dependencies: `pip install -r skills/caeruleus/requirements.txt`
-- **Node.js 20+** with dependencies: `cd skills/caeruleus && npm install`
-- **BLE adapter** — built-in Bluetooth on macOS, or USB HCI adapter on Linux
-- **Linux: BlueZ + Bluetooth service** — `sudo systemctl start bluetooth` (required for `hci0` adapter access)
-- **Linux: `AF_BLUETOOTH` socket permissions** — raw L2CAP ATT operations (`subscribe_raw`, `raw_att`) require `CAP_NET_RAW` or membership in the `bluetooth` group. Verify with: `python3 -c "import socket; socket.socket(31, 5, 0).close(); print('OK')"`
-
-### Optional Hardware
-
-- **Ubertooth One** / **nRF52 Sniffer** / **Sniffle** — passive BLE sniffing
-- **ESP32-Gattacker** (ESP32-S3) — MITM relay and notification spoofing
-
-## Quick Start
+## Build
 
 ```bash
-# Install dependencies
-cd skills/caeruleus
-pip install -r requirements.txt
-npm install
-
-# Linux: ensure Bluetooth service is running and adapter is up
-sudo systemctl start bluetooth
-sudo hciconfig hci0 up
-
-# Scan for devices
-npx tsx scan-devices.ts '{"duration": 10}'
-
-# Enumerate GATT on a target
-npx tsx enumerate-gatt.ts '{"mac_address": "AA:BB:CC:DD:EE:FF"}'
-
-# Fuzz a characteristic
-npx tsx fuzz-characteristic.ts '{"mac_address": "AA:BB:CC:DD:EE:FF", "uuid": "2a00", "strategy": "boundary", "iterations": 100}'
+make build        # -> ./caeruleus
+make test         # unit tests + shell tests
 ```
 
-## Environment Variables
+## Command groups
 
-| Variable | Default | Description |
-|---|---|---|
-| `CAERULEUS_PYTHON` | `python3` | Python interpreter path |
-| `CAERULEUS_ADAPTER` | `hci0` | BlueZ adapter (Linux only) |
-| `CAERULEUS_TRANSPORT` | `usb` | Transport type |
-| `CAERULEUS_SNIFFER_HARDWARE` | `ubertooth` | Sniffer hardware type |
+| Group | Commands |
+|---|---|
+| Discovery / interaction | `scan`, `enumerate`, `primary`, `characteristics`, `read`, `write`, `raw-write`, `listen`, `cccd`, `mtu`, `pair`/`unpair`, `conn-params`, `disconnect`, `forget`, `shell`, `batch`, `serve`/`send` |
+| Security assessment | `recon`, `assess check-auth`, `assess encryption`, `assess dfu`, `assess wwr` |
+| Fuzzing | `fuzz write` (incl. `--raw`), `fuzz replay` |
+| Adapter / diagnostics | `doctor`, `adapter`, `bdaddr`, `monitor` |
 
-## Platform Support
+Every command takes `-b/--bdaddr`, `-i/--adapter`, `-t/--timeout`, and `-o/--format text|json|jsonl`. Assessment commands emit `{address, test, summary, findings[]}` with per-finding `severity`/`handle`/`uuid`/`evidence`. See [`skills/caeruleus/SKILL.md`](skills/caeruleus/SKILL.md) for the full reference and the recommended assessment methodology.
 
-**Linux is required for full functionality.** macOS works for basic operations but has significant limitations due to CoreBluetooth's abstraction layer.
+New to the tool, or coming from bettercap / gatttool / bluetoothctl / nRF Connect / custom Bleak scripts? The [quick reference](docs/quick-reference.md) maps those habits to caeruleus commands.
 
-| Platform | BLE Stack | Status |
-|---|---|---|
-| Linux | BlueZ | **Full support** — recommended for engagements |
-| macOS | CoreBluetooth | Partial — basic recon, reads, writes, and offline analysis work |
+### Quick start
 
-### macOS Limitations
+```bash
+make build
+./caeruleus scan -t 6
+./caeruleus enumerate -b AA:BB:CC:DD:EE:FF --values     # full GATT tree + values
+./caeruleus recon -b AA:BB:CC:DD:EE:FF
+./caeruleus assess check-auth -b AA:BB:CC:DD:EE:FF -o json
+sudo ./caeruleus conn-params -b AA:BB:CC:DD:EE:FF        # root: HCI monitor
+```
 
-CoreBluetooth abstracts the BLE stack and restricts low-level access:
-
-- **No notification/indication support for non-compliant devices** — CoreBluetooth requires CCCD descriptors (0x2902) to be discoverable. Devices that omit CCCDs (common in CTF boards and some IoT firmware) cannot have notifications enabled.
-- **GAP service hidden** — Generic Access (0x1800) and Generic Attribute (0x1801) services are managed internally by macOS and not exposed to applications. The Device Name characteristic (0x2A00) requires a platform-specific fallback.
-- **No MAC address control** — CoreBluetooth uses randomized UUIDs instead of real MAC addresses. MAC spoofing is not possible.
-- **No raw ATT handle writes** — only handles present in the discovered service tree can be accessed. Undiscovered handles (e.g., hidden CCCD descriptors) cannot be written to.
-- **GATT cache persistence** — CoreBluetooth caches GATT data across connections. A Bluetooth power cycle (`blueutil --power 0 && blueutil --power 1`) may be needed to clear stale data.
-
-## Caeruleus-Target (Vulnerable DUT Firmware)
-
-The `caeruleus-target/` directory contains deliberately vulnerable nRF52840 BLE firmware for validating the toolkit. See [`caeruleus-target/README.md`](caeruleus-target/README.md) for build instructions and the full vulnerability matrix.
-
-**GATT profile highlights:**
-- Plaintext credentials and PII exposed over BLE
-- No pairing or encryption enforcement
-- Buffer overflow → HardFault on oversized writes
-- No replay protection
-- Unsigned DFU firmware acceptance
+Privileged commands (`conn-params`, `monitor`, `fuzz write --raw`, `cccd --raw`, `raw-write`, `mtu --set`, `bdaddr --set`) need root; see the skill doc for a scoped sudoers drop-in.
 
 ## Concurrency
 
-**Sequential when interacting with the DUT. Parallel only on offline artifacts.**
-
-BLE has a single active connection — concurrent operations would corrupt state. Phase 4 (reporting) scripts can run in parallel since they only read JSON artifacts.
+BLE has a single active connection per peripheral, so interaction is sequential. Offline correlation/report steps that only read JSON artifacts can run in parallel.
 
 ## License
 

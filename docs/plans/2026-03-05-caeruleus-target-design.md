@@ -39,7 +39,7 @@ Deliberately vulnerable BLE firmware for validating all caeruleus security testi
 
 | Characteristic | UUID | Properties | Vulnerability |
 |---|---|---|---|
-| Stored Credential | `0x0001` | Read | Unprotected read — returns plaintext "admin:password123" |
+| Stored Credential | `0x0001` | Read | Unprotected read - returns plaintext "admin:password123" |
 | Auth Token | `0x0002` | Read, Write | No input validation, accepts any length, no encryption required |
 | Session Key | `0x0003` | Read, Write, WWR | Write-without-response enabled, no rate limiting |
 | User PII | `0x0004` | Read | Returns "John Doe, john@example.com, 555-0123" without encryption |
@@ -48,15 +48,15 @@ Deliberately vulnerable BLE firmware for validating all caeruleus security testi
 
 | Characteristic | UUID | Properties | Vulnerability |
 |---|---|---|---|
-| Command Input | `0x0001` | Write | No sequence number, no nonce — replay vulnerable |
+| Command Input | `0x0001` | Write | No sequence number, no nonce - replay vulnerable |
 | Command Response | `0x0002` | Read, Notify | Buffer overflow on writes >244 bytes → HardFault |
-| Admin Control | `0x0003` | Read, Write | Accessible after unpairing — auth bypass |
+| Admin Control | `0x0003` | Read, Write | Accessible after unpairing - auth bypass |
 
 ### Sensor Simulation Service (0x5E45)
 
 | Characteristic | UUID | Properties | Vulnerability |
 |---|---|---|---|
-| Temperature | `0x0001` | Read, Notify | Notification without encryption — MITM spoofable |
+| Temperature | `0x0001` | Read, Notify | Notification without encryption - MITM spoofable |
 | Humidity | `0x0002` | Read, Notify | Same |
 | Battery Level | `0x0003` | Read, Notify | Same |
 
@@ -77,16 +77,16 @@ Deliberately vulnerable BLE firmware for validating all caeruleus security testi
 - **Pairing mode:** Just Works (no passkey, no OOB)
 - **MITM protection:** Disabled (`SEC_MITM = 0`)
 - **Legacy pairing:** Accepted (fallback from LE Secure Connections)
-- **Encryption required:** No — all characteristics accessible without pairing
+- **Encryption required:** No - all characteristics accessible without pairing
 - **Bond storage:** Yes, but bonding not enforced for access
 
 ### Connection Parameters
 
 | Parameter | Value | Weakness |
 |---|---|---|
-| Connection interval | 400ms | Slow — vulnerable to connection manipulation |
-| Slave latency | 10 | High — device may miss commands |
-| Supervision timeout | 800ms | Tight — easy to force disconnection |
+| Connection interval | 400ms | Slow - vulnerable to connection manipulation |
+| Slave latency | 10 | High - device may miss commands |
+| Supervision timeout | 800ms | Tight - easy to force disconnection |
 | MTU | 247 | Standard |
 
 ### Crash & Recovery
@@ -175,7 +175,7 @@ nrfjprog --reset -f nrf52
 ### DFU Package Creation
 
 ```bash
-# Unsigned package (should be accepted — vulnerability)
+# Unsigned package (should be accepted - vulnerability)
 nrfutil pkg generate --application app_v2.hex \
   --application-version 2 --hw-version 52 \
   --sd-req 0x0100 --no-key unsigned_dfu.zip
@@ -185,7 +185,7 @@ nrfutil pkg generate --application app_v2.hex \
   --application-version 2 --hw-version 52 \
   --sd-req 0x0100 --key-file keys/private.pem signed_dfu.zip
 
-# Downgrade package (version 0 — should be rejected but won't be)
+# Downgrade package (version 0 - should be rejected but won't be)
 nrfutil pkg generate --application app_v1.hex \
   --application-version 0 --hw-version 52 \
   --sd-req 0x0100 --no-key downgrade_dfu.zip

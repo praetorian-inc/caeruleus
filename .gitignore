@@ -1,13 +1,24 @@
 # OS
 .DS_Store
 
-# Claude Code
-.claude/*
-!.claude/skills/
+# Agent/editor local state
+.claude/
 # Editor/tooling artifacts (can appear nested under skills)
 .history/
 .local/
 .output/
+
+# Go build artifacts (binaries built at repo root)
+/caeruleus
+/shell-harness
+*.swp
+*.swo
+.idea/
+.vscode/
+
+# Fuzzing output
+fuzz-out-*/
+fuzz-out/
 
 # Node
 node_modules/
@@ -23,3 +34,7 @@ __pycache__/
 *.out
 *.map
 *.in
+
+# DUT test firmware (kept locally, maintained outside this repo)
+/caeruleus-target/
+/caeruleus-target-secure/

@@ -1,8 +1,0 @@
-# Core BLE library — 0.22+ for stable API, works on Linux (BlueZ) and macOS (CoreBluetooth)
-bleak>=0.22.0
-# BlueZ-only helper (Linux only — not used on macOS)
-bluepy>=1.3.0; sys_platform == "linux"
-# YAML IPC — must be >=6.0 for Python 3.10+ (collections.abc.Hashable fix)
-pyyaml>=6.0.1
-# Packet analysis
-scapy>=2.6.0
