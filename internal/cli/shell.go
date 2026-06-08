@@ -203,6 +203,8 @@ func shellCompleter() readline.AutoCompleter {
 		readline.PcItem("exit"),
 		readline.PcItem("connect"),
 		readline.PcItem("disconnect"),
+		readline.PcItem("pair"),
+		readline.PcItem("unpair"),
 		readline.PcItem("primary"),
 		readline.PcItem("characteristics"),
 		readline.PcItem("enumerate"),
@@ -236,6 +238,10 @@ func (sh *shell) run(ctx context.Context, line string) (quit bool) {
 		sh.cmdConnect(ctx, args)
 	case "disconnect":
 		sh.cmdDisconnect()
+	case "pair":
+		sh.cmdPair(args)
+	case "unpair":
+		sh.cmdUnpair()
 	case "primary":
 		sh.cmdPrimary()
 	case "characteristics", "chars":
@@ -274,6 +280,9 @@ func printShellHelp(w io.Writer) {
 	fmt.Fprintln(w, `commands:
   connect [BDADDR]              connect to current or new device
   disconnect                    drop the GATT link
+  pair [PASSKEY]                bond with the device (PASSKEY for MITM devices);
+                                protected characteristics become readable after
+  unpair                        remove the bond
   primary                       list primary services
   characteristics               list characteristics
   enumerate                     print full GATT tree with values
@@ -294,6 +303,59 @@ func printShellHelp(w io.Writer) {
 }
 
 // --- handlers ---
+
+// cmdPair bonds with the current device. An optional argument is the passkey
+// for a Passkey-Entry (MITM) peripheral; with no argument a NoInputNoOutput
+// agent is used (Just Works). Once bonded, encryption-required characteristics
+// become readable over this held connection.
+func (sh *shell) cmdPair(args []string) {
+	if sh.s.device == nil {
+		fmt.Fprintln(sh.errOut(), "no device - connect first")
+		return
+	}
+	var passkey *uint32
+	capability := bluez.CapNoInputNoOutput
+	if len(args) > 0 {
+		n, err := strconv.ParseUint(args[0], 10, 32)
+		if err != nil || n > 999999 {
+			fmt.Fprintf(sh.errOut(), "bad passkey %q (expected up to 6 digits)\n", args[0])
+			return
+		}
+		u := uint32(n)
+		passkey = &u
+		capability = bluez.CapKeyboardDisplay
+	}
+	agent := &bluez.PairingAgent{Passkey: passkey, Logf: func(f string, v ...interface{}) {
+		fmt.Fprintf(sh.errOut(), f+"\n", v...)
+	}}
+	cleanup, err := sh.s.conn.RegisterPairingAgent(capability, agent)
+	if err != nil {
+		fmt.Fprintf(sh.errOut(), "pairing agent: %v\n", err)
+		return
+	}
+	defer cleanup()
+
+	perr := sh.s.device.Pair()
+	if paired, _ := sh.s.device.Paired(); paired {
+		model, mitm := agent.Model()
+		fmt.Fprintf(sh.errOut(), "paired (association=%s mitm=%v); protected characteristics now readable on this link\n", model, mitm)
+	} else {
+		fmt.Fprintf(sh.errOut(), "pair failed: %v\n", perr)
+	}
+}
+
+// cmdUnpair removes the bond for the current device.
+func (sh *shell) cmdUnpair() {
+	if sh.s.device == nil {
+		fmt.Fprintln(sh.errOut(), "no device")
+		return
+	}
+	if err := sh.s.conn.RemoveDevice(sh.s.device.Path); err != nil {
+		fmt.Fprintf(sh.errOut(), "unpair: %v\n", err)
+		return
+	}
+	fmt.Fprintln(sh.errOut(), "unpaired (bond removed; reconnect to use the device again)")
+}
 
 func (sh *shell) ensureConnected() bool {
 	if sh.s.device == nil {

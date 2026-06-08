@@ -52,10 +52,11 @@ func runAssessEncryption(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// --- Phase B: attempt pairing ---
+	// --- Phase B: attempt pairing (Just Works; the automated flow does not
+	// supply a passkey) ---
 	ctx, cancel := ctxWithRootTimeout()
 	defer cancel()
-	pa, err := attemptPair(ctx, addr)
+	pa, err := attemptPair(ctx, addr, bluez.CapNoInputNoOutput, nil)
 	if err != nil {
 		return err
 	}
