@@ -402,6 +402,35 @@ func (d *Device) Pair() error {
 	return d.obj.Call(IfaceDevice+".Pair", 0).Err
 }
 
+// CancelPairing aborts an in-progress Device1.Pair. Safe to call when no
+// pairing is underway (BlueZ returns DoesNotExist, which callers ignore).
+func (d *Device) CancelPairing() error {
+	return d.obj.Call(IfaceDevice+".CancelPairing", 0).Err
+}
+
+// Paired reports the BlueZ Device1.Paired property — whether a pairing
+// procedure has completed for this peer (with or without a stored bond).
+func (d *Device) Paired() (bool, error) {
+	v, err := getProp(d.obj, IfaceDevice, "Paired")
+	if err != nil {
+		return false, err
+	}
+	b, _ := v.(bool)
+	return b, nil
+}
+
+// Bonded reports the Device1.Bonded property — whether long-term keys are
+// stored for this peer. Older BlueZ (<5.50) lacks this property; callers
+// should treat the error as "unknown" rather than fatal.
+func (d *Device) Bonded() (bool, error) {
+	v, err := getProp(d.obj, IfaceDevice, "Bonded")
+	if err != nil {
+		return false, err
+	}
+	b, _ := v.(bool)
+	return b, nil
+}
+
 // --- GATT object helpers ------------------------------------------------
 
 // GattObject is a unified view of any GATT-related D-Bus object.

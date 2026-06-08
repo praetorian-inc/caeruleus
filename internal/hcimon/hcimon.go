@@ -52,6 +52,14 @@ const (
 
 	// L2CAP CID for the Attribute Protocol fixed channel.
 	cidATT = 0x0004
+
+	// HCI event decoding — Core Spec Vol 4 Part E. The LE Meta event (0x3E)
+	// carries the LE subevents we use to recover connection parameters that
+	// BlueZ does not surface over D-Bus.
+	hciEvtLEMeta           = 0x3E
+	leSubConnComplete      = 0x01
+	leSubConnUpdate        = 0x03
+	leSubEnhConnComplete   = 0x0A
 )
 
 // Notification is a parsed inbound ATT Handle Value Notification or Indication.
@@ -113,7 +121,46 @@ func (m *Monitor) Close() error {
 // socket. out is closed before Run returns.
 func (m *Monitor) Run(ctx context.Context, out chan<- Notification) error {
 	defer close(out)
+	return m.readLoop(ctx, func(pkt []byte) bool {
+		note, ok := parsePacket(pkt)
+		if !ok {
+			return true
+		}
+		select {
+		case out <- note:
+			return true
+		case <-ctx.Done():
+			return false
+		}
+	})
+}
 
+// RunConn reads from the monitor socket and pushes every parsed LE connection
+// event (Connection Complete / Enhanced Connection Complete / Connection
+// Update Complete) to out. Same lifecycle as Run: out is closed before return.
+// This is how connection parameters (interval / latency / supervision timeout)
+// are recovered — BlueZ does not expose them over D-Bus.
+func (m *Monitor) RunConn(ctx context.Context, out chan<- ConnEvent) error {
+	defer close(out)
+	return m.readLoop(ctx, func(pkt []byte) bool {
+		ev, ok := parseConnEvent(pkt)
+		if !ok {
+			return true
+		}
+		select {
+		case out <- ev:
+			return true
+		case <-ctx.Done():
+			return false
+		}
+	})
+}
+
+// readLoop polls the monitor socket and hands each raw frame to onFrame.
+// onFrame returns false to stop the loop (used when a downstream send races
+// a canceled context). The loop also stops on ctx cancellation or a fatal
+// socket error.
+func (m *Monitor) readLoop(ctx context.Context, onFrame func(pkt []byte) bool) error {
 	buf := make([]byte, 4096)
 	pfd := []unix.PollFd{{Fd: int32(m.fd), Events: unix.POLLIN}}
 
@@ -146,13 +193,8 @@ func (m *Monitor) Run(ctx context.Context, out chan<- Notification) error {
 		if rn <= 0 {
 			continue
 		}
-
-		if note, ok := parsePacket(buf[:rn]); ok {
-			select {
-			case out <- note:
-			case <-ctx.Done():
-				return nil
-			}
+		if !onFrame(buf[:rn]) {
+			return nil
 		}
 	}
 }
@@ -226,4 +268,116 @@ func parseACL(acl []byte, index uint16) (Notification, bool) {
 		Value:      value,
 		IsIndicate: op == ATTOpIndication,
 	}, true
+}
+
+// ConnEvent is a parsed LE connection-parameter event. It comes either from
+// the initial Connection Complete (Updated=false, PeerAddr populated) or a
+// later Connection Update Complete (Updated=true, PeerAddr empty — the event
+// is keyed only by connection handle, so callers correlate on ConnHandle).
+//
+// The raw interval / latency / timeout are in HCI units; the helper methods
+// convert to human terms (interval 1.25ms/unit, supervision timeout 10ms/unit,
+// latency is a dimensionless count of connection events the peripheral may skip).
+type ConnEvent struct {
+	When          time.Time
+	Adapter       uint16 // HCI device index (hci0 = 0)
+	ConnHandle    uint16
+	Updated       bool   // false = Connection Complete, true = Connection Update Complete
+	Status        uint8  // HCI status (0 = success)
+	Role          uint8  // 0 = central/master, 1 = peripheral/slave
+	PeerAddrType  uint8  // 0 = public, 1 = random
+	PeerAddr      string // "AA:BB:CC:DD:EE:FF" (MSB-first); empty on update events
+	IntervalUnits uint16
+	LatencyEvents uint16
+	TimeoutUnits  uint16
+}
+
+// IntervalMillis returns the connection interval in milliseconds (1.25ms/unit).
+func (e ConnEvent) IntervalMillis() float64 { return float64(e.IntervalUnits) * 1.25 }
+
+// TimeoutMillis returns the supervision timeout in milliseconds (10ms/unit).
+func (e ConnEvent) TimeoutMillis() int { return int(e.TimeoutUnits) * 10 }
+
+// parseConnEvent decodes an LE Meta connection event from a monitor frame.
+// Anything that is not an LE Connection Complete / Enhanced Connection
+// Complete / Connection Update Complete is silently skipped.
+func parseConnEvent(pkt []byte) (ConnEvent, bool) {
+	if len(pkt) < 6 {
+		return ConnEvent{}, false
+	}
+	opcode := binary.LittleEndian.Uint16(pkt[0:2])
+	index := binary.LittleEndian.Uint16(pkt[2:4])
+	plen := binary.LittleEndian.Uint16(pkt[4:6])
+	if int(6+plen) > len(pkt) {
+		return ConnEvent{}, false
+	}
+	payload := pkt[6 : 6+plen]
+
+	// Host-bound HCI Event packet only.
+	if opcode != monOpcodeEventPkt {
+		return ConnEvent{}, false
+	}
+	// Event header: event_code(1), param_len(1), params...
+	if len(payload) < 2 || payload[0] != hciEvtLEMeta {
+		return ConnEvent{}, false
+	}
+	params := payload[2:]
+	if len(params) < 1 {
+		return ConnEvent{}, false
+	}
+	ev := ConnEvent{When: time.Now(), Adapter: index}
+	switch params[0] { // LE subevent code
+	case leSubConnComplete:
+		// subevent(1) status(1) handle(2) role(1) peer_type(1) peer_addr(6)
+		// interval(2) latency(2) timeout(2) clock_accuracy(1) = 19 bytes
+		if len(params) < 19 {
+			return ConnEvent{}, false
+		}
+		ev.Status = params[1]
+		ev.ConnHandle = binary.LittleEndian.Uint16(params[2:4]) & 0x0FFF
+		ev.Role = params[4]
+		ev.PeerAddrType = params[5]
+		ev.PeerAddr = addrFromLE(params[6:12])
+		ev.IntervalUnits = binary.LittleEndian.Uint16(params[12:14])
+		ev.LatencyEvents = binary.LittleEndian.Uint16(params[14:16])
+		ev.TimeoutUnits = binary.LittleEndian.Uint16(params[16:18])
+	case leSubEnhConnComplete:
+		// Same as above but with local_rpa(6) + peer_rpa(6) inserted after
+		// peer_addr, pushing the parameters to offset 24.
+		if len(params) < 31 {
+			return ConnEvent{}, false
+		}
+		ev.Status = params[1]
+		ev.ConnHandle = binary.LittleEndian.Uint16(params[2:4]) & 0x0FFF
+		ev.Role = params[4]
+		ev.PeerAddrType = params[5]
+		ev.PeerAddr = addrFromLE(params[6:12])
+		ev.IntervalUnits = binary.LittleEndian.Uint16(params[24:26])
+		ev.LatencyEvents = binary.LittleEndian.Uint16(params[26:28])
+		ev.TimeoutUnits = binary.LittleEndian.Uint16(params[28:30])
+	case leSubConnUpdate:
+		// subevent(1) status(1) handle(2) interval(2) latency(2) timeout(2) = 10 bytes
+		if len(params) < 10 {
+			return ConnEvent{}, false
+		}
+		ev.Status = params[1]
+		ev.ConnHandle = binary.LittleEndian.Uint16(params[2:4]) & 0x0FFF
+		ev.Updated = true
+		ev.IntervalUnits = binary.LittleEndian.Uint16(params[4:6])
+		ev.LatencyEvents = binary.LittleEndian.Uint16(params[6:8])
+		ev.TimeoutUnits = binary.LittleEndian.Uint16(params[8:10])
+	default:
+		return ConnEvent{}, false
+	}
+	return ev, true
+}
+
+// addrFromLE renders a little-endian 6-byte BD_ADDR (HCI wire order) as the
+// conventional MSB-first colon string.
+func addrFromLE(b []byte) string {
+	if len(b) < 6 {
+		return ""
+	}
+	return fmt.Sprintf("%02X:%02X:%02X:%02X:%02X:%02X",
+		b[5], b[4], b[3], b[2], b[1], b[0])
 }
