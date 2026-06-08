@@ -82,6 +82,10 @@ func runCheckAuth(cmd *cobra.Command, args []string) error {
 					sev = SevHigh
 					title = "Secret readable without authentication"
 					detail = fmt.Sprintf("Titus matched rule %q; value read over an unpaired, unencrypted link.", rule)
+				} else if looksLikeCredential(asciiize(v)) {
+					sev = SevHigh
+					title = "Likely-sensitive value readable without authentication"
+					detail = "Value matches a credential/secret pattern (heuristic); read over an unpaired, unencrypted link."
 				}
 				res.Findings = append(res.Findings, Finding{
 					Title:    title,

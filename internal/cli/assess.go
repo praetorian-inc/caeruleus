@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 	"os"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -160,6 +161,29 @@ func detectSecret(value []byte) (string, bool) {
 		return "", false
 	}
 	return matches[0].RuleName, true
+}
+
+// credPairRe matches a "user:secret" pair such as "admin:password123".
+var credPairRe = regexp.MustCompile(`^[A-Za-z0-9._@-]{1,32}:[^\s:]{4,}$`)
+
+// looksLikeCredential is a light heuristic for plaintext credentials/secrets
+// that Titus's structured-secret rules do not flag (e.g. a username:password
+// pair, or text containing a password/secret keyword or a PEM key header).
+// Used as a lower-confidence backstop behind detectSecret.
+func looksLikeCredential(ascii string) bool {
+	s := strings.TrimSpace(ascii)
+	if s == "" {
+		return false
+	}
+	l := strings.ToLower(s)
+	for _, k := range []string{"password", "passwd", "pwd=", "passphrase",
+		"secret", "bearer ", "api key", "apikey", "api_key", "credential",
+		"private key", "begin rsa", "begin ec", "begin openssh", "begin private"} {
+		if strings.Contains(l, k) {
+			return true
+		}
+	}
+	return credPairRe.MatchString(s)
 }
 
 // isSIGBaseUUID reports whether a 128-bit UUID is in the Bluetooth SIG base
