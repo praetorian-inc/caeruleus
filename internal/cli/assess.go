@@ -72,6 +72,7 @@ findings (use -o json for the skill / report layer).
 Subcommands:
   check-auth    what an unpaired attacker can read (and optionally write)
   encryption    whether pairing changes what is exposed (enforcement / fallback)
+  pairing       SMP feature-exchange + downgrade probe (raw, root, takes over adapter)
   wwr           write-without-response overflow + rapid-fire resilience
   dfu           detect a DFU service and whether entry is unauthenticated
 
@@ -81,6 +82,7 @@ found. See 'caeruleus recon' for the passive profile + GATT audit.`,
 	c.AddCommand(
 		newAssessCheckAuthCmd(),
 		newAssessEncryptionCmd(),
+		newAssessPairingCmd(),
 		newAssessWWRCmd(),
 		newAssessDFUCmd(),
 	)
