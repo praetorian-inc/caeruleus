@@ -1,9 +1,8 @@
 # OS
 .DS_Store
 
-# Claude Code
-.claude/*
-!.claude/skills/
+# Agent/editor local state
+.claude/
 # Editor/tooling artifacts (can appear nested under skills)
 .history/
 .local/

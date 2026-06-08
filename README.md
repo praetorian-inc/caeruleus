@@ -1,6 +1,6 @@
 # Caeruleus
 
-Caeruleus is a hardware-agnostic BLE security testing toolkit for Linux/BlueZ, implemented as a single Go binary (`caeruleus`). It covers the full interaction-to-assessment lifecycle — scan, enumerate, read/write/notify, coverage-guided fuzzing, and structured security assessment — talking to peripherals directly over BlueZ D-Bus and raw L2CAP/HCI sockets. A portable [Agent Skill](https://agentskills.io) (`.claude/skills/caeruleus/`) orchestrates the binary's `-o json` output into assessment workflows and reports, and works with any Agent Skills-compatible agent.
+Caeruleus is a hardware-agnostic BLE security testing toolkit for Linux/BlueZ, implemented as a single Go binary (`caeruleus`). It covers the full interaction-to-assessment lifecycle — scan, enumerate, read/write/notify, coverage-guided fuzzing, and structured security assessment — talking to peripherals directly over BlueZ D-Bus and raw L2CAP/HCI sockets. A portable [Agent Skill](https://agentskills.io) (`skills/caeruleus/`) orchestrates the binary's `-o json` output into assessment workflows and reports, and works with any Agent Skills-compatible agent.
 
 *caeruleus* — Latin for "blue"
 
@@ -9,7 +9,7 @@ Caeruleus is a hardware-agnostic BLE security testing toolkit for Linux/BlueZ, i
 ## Architecture
 
 ```
-AI agent (Agent Skills)  ──drives──►  caeruleus skill (.claude/skills/caeruleus/SKILL.md)
+AI agent (Agent Skills)  ──drives──►  caeruleus skill (skills/caeruleus/SKILL.md)
                                       │  shells out, consumes -o json
                                       ▼
                          caeruleus (Go binary, this repo)
@@ -33,9 +33,9 @@ caeruleus/
 │   ├── hcimon/           # HCI monitor decode (notifications + connection params)
 │   ├── bdaddr/           # adapter BD_ADDR read/spoof (vendor HCI)
 │   └── fuzz/             # engine, mutator, AFLNet-style oracle, corpus, trace
+├── skills/caeruleus/     # the Go-driven Agent Skill (portable; agentskills.io format)
 ├── caeruleus-target/     # deliberately-vulnerable nRF52840 DUT firmware
-├── docs/                 # fuzzing-plan.md, ux-improvements.md
-└── .claude/skills/       # the Go-driven Agent Skill (portable; agentskills.io format)
+└── docs/                 # fuzzing-plan.md, ux-improvements.md
 ```
 
 ## Build
@@ -54,7 +54,7 @@ make test         # unit tests + shell smoke tests
 | Fuzzing | `fuzz write` (incl. `--raw`), `fuzz replay` |
 | Adapter / diagnostics | `doctor`, `adapter`, `disconnect`, `forget`, `bdaddr`, `monitor`, `raw-write` |
 
-Every command takes `-b/--bdaddr`, `-i/--adapter`, `-t/--timeout`, and `-o/--format text|json|jsonl`. Assessment commands emit `{address, test, summary, findings[]}` with per-finding `severity`/`handle`/`uuid`/`evidence`. See [`.claude/skills/caeruleus/SKILL.md`](.claude/skills/caeruleus/SKILL.md) for the full reference and the recommended assessment methodology.
+Every command takes `-b/--bdaddr`, `-i/--adapter`, `-t/--timeout`, and `-o/--format text|json|jsonl`. Assessment commands emit `{address, test, summary, findings[]}` with per-finding `severity`/`handle`/`uuid`/`evidence`. See [`skills/caeruleus/SKILL.md`](skills/caeruleus/SKILL.md) for the full reference and the recommended assessment methodology.
 
 ### Quick start
 
