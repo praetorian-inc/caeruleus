@@ -32,8 +32,9 @@ const (
 )
 
 type PairingAgent struct {
-	Passkey *uint32                      // operator-supplied passkey for Passkey Entry (input side)
-	Logf    func(string, ...interface{}) // surface display/confirm prompts to the operator (may be nil)
+	Passkey        *uint32                      // operator-supplied passkey for Passkey Entry (input side)
+	Logf           func(string, ...interface{}) // surface display/confirm prompts to the operator (may be nil)
+	PromptPasskey  func() (uint32, error)       // interactive passkey prompt; called when Passkey is nil and the peripheral requests input
 
 	mu    sync.Mutex
 	model string // "just-works" | "passkey-entry" | "numeric-comparison"
@@ -77,7 +78,14 @@ func (a *PairingAgent) RequestPinCode(dbus.ObjectPath) (string, *dbus.Error) {
 	if a.Passkey != nil {
 		return fmt.Sprintf("%06d", *a.Passkey), nil
 	}
-	a.logf("peripheral requested a PIN/passkey but none was supplied (use --passkey)")
+	if a.PromptPasskey != nil {
+		pk, err := a.PromptPasskey()
+		if err != nil {
+			return "", dbus.NewError("org.bluez.Error.Rejected", nil)
+		}
+		return fmt.Sprintf("%06d", pk), nil
+	}
+	a.logf("peripheral requested a PIN/passkey but none was supplied (use --passkey or --passkey -)")
 	return "", dbus.NewError("org.bluez.Error.Rejected", nil)
 }
 
@@ -86,7 +94,14 @@ func (a *PairingAgent) RequestPasskey(dbus.ObjectPath) (uint32, *dbus.Error) {
 	if a.Passkey != nil {
 		return *a.Passkey, nil
 	}
-	a.logf("peripheral requested a passkey to enter but none was supplied (use --passkey)")
+	if a.PromptPasskey != nil {
+		pk, err := a.PromptPasskey()
+		if err != nil {
+			return 0, dbus.NewError("org.bluez.Error.Rejected", nil)
+		}
+		return pk, nil
+	}
+	a.logf("peripheral requested a passkey to enter but none was supplied (use --passkey or --passkey -)")
 	return 0, dbus.NewError("org.bluez.Error.Rejected", nil)
 }
 

@@ -60,13 +60,13 @@ func runAssessEncryption(cmd *cobra.Command, args []string) error {
 	// peripheral rejects pairing do we drop our record and retry once from a
 	// clean slate: a rejection can mean a retained half-bond from a prior
 	// session, which RemoveDevice clears.
-	pa, err := attemptPair(ctx, addr, bluez.CapNoInputNoOutput, nil)
+	pa, err := attemptPair(ctx, addr, bluez.CapNoInputNoOutput, nil, "auto", nil)
 	if err != nil {
 		return err
 	}
 	if !pa.paired {
 		forgetDevice(addr)
-		if pa2, e := attemptPair(ctx, addr, bluez.CapNoInputNoOutput, nil); e == nil {
+		if pa2, e := attemptPair(ctx, addr, bluez.CapNoInputNoOutput, nil, "auto", nil); e == nil {
 			pa = pa2
 		}
 	}

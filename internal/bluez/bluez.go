@@ -462,6 +462,27 @@ func (d *Device) Paired() (bool, error) {
 	return b, nil
 }
 
+// WaitPaired polls the Paired property until it becomes true, the context is
+// canceled, or the timeout expires. Returns (true, nil) if pairing completed,
+// (false, nil) on timeout/cancel (not an error — the caller should fall back
+// to explicit Pair).
+func (d *Device) WaitPaired(ctx context.Context, timeout time.Duration) (bool, error) {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	t := time.NewTicker(200 * time.Millisecond)
+	defer t.Stop()
+	for {
+		if p, _ := d.Paired(); p {
+			return true, nil
+		}
+		select {
+		case <-ctx.Done():
+			return false, nil
+		case <-t.C:
+		}
+	}
+}
+
 // Bonded reports the Device1.Bonded property - whether long-term keys are
 // stored for this peer. Older BlueZ (<5.50) lacks this property; callers
 // should treat the error as "unknown" rather than fatal.
