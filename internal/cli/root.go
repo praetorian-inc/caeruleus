@@ -77,12 +77,13 @@ mtu --set/--reset) require root.`
 		}
 	}
 
-	// Group commands in help the same way the README does, in a sensible
-	// workflow order within each group (discovery -> interaction; recon ->
-	// active tests; fuzzing; adapter/diagnostics). `help` and `completion`
-	// stay ungrouped under "Additional Commands".
+	// Groups follow the BLE assessment workflow: discover the device, talk
+	// to it, manage the link, script it, then move into security testing.
 	cmd.AddGroup(
-		&cobra.Group{ID: "interact", Title: "Discovery & interaction:"},
+		&cobra.Group{ID: "discover", Title: "Discovery:"},
+		&cobra.Group{ID: "gatt", Title: "GATT operations:"},
+		&cobra.Group{ID: "conn", Title: "Connection management:"},
+		&cobra.Group{ID: "script", Title: "Scripting & automation:"},
 		&cobra.Group{ID: "assess", Title: "Security assessment:"},
 		&cobra.Group{ID: "fuzz", Title: "Fuzzing:"},
 		&cobra.Group{ID: "diag", Title: "Adapter & diagnostics:"},
@@ -93,11 +94,18 @@ mtu --set/--reset) require root.`
 			cmd.AddCommand(c)
 		}
 	}
-	add("interact",
+	add("discover",
 		newScanCmd(), newEnumerateCmd(), newPrimaryCmd(), newCharacteristicsCmd(),
+	)
+	add("gatt",
 		newReadCmd(), newWriteCmd(), newRawWriteCmd(), newListenCmd(), newCCCDCmd(),
-		newMTUCmd(), newPairCmd(), newUnpairCmd(), newConnParamsCmd(),
+		newMTUCmd(),
+	)
+	add("conn",
+		newPairCmd(), newUnpairCmd(), newConnParamsCmd(),
 		newDisconnectCmd(), newForgetCmd(),
+	)
+	add("script",
 		newShellCmd(), newBatchCmd(), newServeCmd(), newSendCmd(),
 	)
 	add("assess",

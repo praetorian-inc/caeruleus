@@ -64,7 +64,7 @@ type assessResult struct {
 func newAssessCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "assess",
-		Short: "Security-assessment workflows over BLE primitives (recon lives at top level)",
+		Short: "Active security tests: auth, encryption, pairing, write-without-response, DFU",
 		Long: `assess groups the active security tests that compose the read / write /
 pair / listen primitives into a single deterministic pass and emit structured
 findings (use -o json for the skill / report layer).
