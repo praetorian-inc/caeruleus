@@ -17,7 +17,7 @@ func newForgetCmd() *cobra.Command {
 Adapter1.RemoveDevice. Any cached GATT structure, CCCD subscription state,
 and pairing record is dropped. The next connect re-discovers from scratch.
 
-Use this when a peripheral is wedged - e.g. bluetoothd thinks it's still
+Use this when a peripheral is unresponsive - e.g. bluetoothd thinks it's still
 Connected=true after an ungraceful link teardown, or you want a fresh CCCD
 enable instead of BlueZ's auto-restore behaviour.`,
 		RunE: runForget,

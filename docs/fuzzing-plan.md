@@ -17,7 +17,7 @@ README's positioning.
 
 Pentest-use target: a pentester points caeruleus at a single peripheral
 characteristic, walks away for an hour, comes back to a `crashes/` dir
-containing reproducible PoC inputs that wedged the target. Not academic
+containing reproducible PoC inputs that locked up the target. Not academic
 novelty - predictable, reproducible, customer-shippable artifacts.
 
 ## Phasing

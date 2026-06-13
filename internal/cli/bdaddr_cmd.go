@@ -132,7 +132,7 @@ func runBdaddr(cmd *cobra.Command, args []string) error {
 	if bdaddrFlags.refreshBluez {
 		// --refresh-bluez opt-in path: HCIDEVRESET so bluetoothd re-reads
 		// the address, with a conditional INQUIRY-clear power-cycle if
-		// the reset leaves the controller wedged. WARNING: the power
+		// the reset leaves the controller unresponsive. WARNING: the power
 		// cycle, if it fires, re-loads OTP and undoes the spoof. This is
 		// the right path only when the user explicitly wants bluetoothd
 		// to display the new address.

@@ -11,17 +11,17 @@ import (
 	"caeruleus/internal/bluez"
 )
 
-// errLEScanWedged is returned by verifyLEHealthy when an active discovery
-// produces zero events in the given window. It carries a fix hint suitable
-// for direct display to the user.
-var errLEScanWedged = errors.New("LE scan appears wedged - try `caeruleus adapter power cycle`")
+// errLEScanUnresponsive is returned by verifyLEHealthy when an active
+// discovery produces zero events in the given window. It carries a fix
+// hint suitable for direct display to the user.
+var errLEScanUnresponsive = errors.New("LE scan appears unresponsive - try `caeruleus adapter power cycle`")
 
 // verifyLEHealthy probes whether the LE side of the controller is
 // currently delivering advertisements. It starts a short discovery and
 // waits for any InterfacesAdded or PropertiesChanged-with-RSSI event,
 // timing out after window.
 //
-// Returns nil if at least one event arrived. Returns errLEScanWedged if
+// Returns nil if at least one event arrived. Returns errLEScanUnresponsive if
 // no events arrived - most likely a post-HCIDEVRESET stuck state. Other
 // errors mean we couldn't even start the probe (no bus, no adapter,
 // discovery already-in-progress on a conflicting filter, etc.).
@@ -72,9 +72,9 @@ func verifyLEHealthy(ctx context.Context, window time.Duration) error {
 	for {
 		select {
 		case <-deadline:
-			return errLEScanWedged
+			return errLEScanUnresponsive
 		case <-subCtx.Done():
-			return errLEScanWedged
+			return errLEScanUnresponsive
 		case <-addCh:
 			return nil
 		case ev, ok := <-propCh:

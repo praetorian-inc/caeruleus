@@ -28,7 +28,7 @@ disruptive operations.
 Checks (per adapter):
   - bluetoothd active?
   - Adapter1.Powered
-  - Adapter1.Discovering (anything wedged from earlier?)
+  - Adapter1.Discovering (anything stuck from earlier?)
   - BlueZ-cached Address vs MGMT chip-live Address (mismatch = stale cache)
   - LE scan healthy (brief 2s discovery probe)
   - ExchangeMTU configured (in safe band for typical peripherals?)`,

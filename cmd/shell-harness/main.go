@@ -115,7 +115,7 @@ func (s *shellSession) reset() {
 // close attempts a graceful shutdown - sends "quit" and waits up to 3s
 // for the child's deferred cleanup to run (including session.close which
 // waits for BlueZ Connected=false). Falls back to Kill on timeout so the
-// harness never hangs on a wedged child.
+// harness never hangs on an unresponsive child.
 //
 // Graceful close matters: SIGKILL skips the caeruleus process's deferred
 // cleanup, leaving BLE link state in flight at process exit. The next
