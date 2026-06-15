@@ -78,7 +78,7 @@ All emit `{address, test, summary, findings[]}`; findings carry `severity` (info
 |---|---|
 | `fuzz write -b A -a 0xHND [--type req\|cmd\|both] [--max-iter N] [--max-time D]` | Fuzz writes with an on-disk corpus and crash/hang triage. Output dir `fuzz-out-<ts>/`. |
 | `fuzz write … --raw [--include prep,exec]` | Drive raw L2CAP (oversized single-PDU + multi-part writes); root. |
-| `fuzz write … --target-reset "CMD"` | Run a recovery shell command when the target wedges. |
+| `fuzz write … --target-reset "CMD"` | Run a recovery shell command when the target locks up. |
 | `fuzz replay DIR/file` | Re-send a saved corpus/crash input to reproduce. |
 
 ### Adapter & diagnostics
@@ -95,7 +95,7 @@ All emit `{address, test, summary, findings[]}`; findings carry `severity` (info
 
 ## Assessment methodology
 
-Run in order, capturing each step's JSON, then synthesize. If a step wedges the device, run `disconnect` / `forget` or `adapter power cycle` before continuing.
+Run in order, capturing each step's JSON, then synthesize. If a step locks up the device, run `disconnect` / `forget` or `adapter power cycle` before continuing.
 
 ```bash
 A=AA:BB:CC:DD:EE:FF

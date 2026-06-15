@@ -26,7 +26,7 @@ If you already use another BLE tool, jump to the row that matches your habit.
 | `nrfutil` / DFU poking | spotting an exposed DFU entry | `caeruleus assess dfu -b <mac>` |
 | custom write fuzzers / boofuzz harness | fuzzing a writable characteristic | `caeruleus fuzz write -b <mac> -a 0xHND` |
 | `hcitool con` / nRF Connect conn-params | interval / latency / timeout / MTU | `sudo caeruleus conn-params -b <mac>` ; `caeruleus mtu -b <mac> --show` |
-| `hciconfig reset` / `rfkill` / power-cycling the dongle | unwedging a stuck adapter | `caeruleus doctor` ; `caeruleus adapter power cycle` ; `caeruleus forget -b <mac>` |
+| `hciconfig reset` / `rfkill` / power-cycling the dongle | recovering a stuck adapter | `caeruleus doctor` ; `caeruleus adapter power cycle` ; `caeruleus forget -b <mac>` |
 | `bdaddr` (BlueZ tool) | reading / spoofing the adapter MAC | `sudo caeruleus bdaddr --show` / `--set <mac>` |
 
 ## A few worked examples

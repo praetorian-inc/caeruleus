@@ -208,7 +208,7 @@ func (d *Device) Connect(ctx context.Context, timeout time.Duration) error {
 	case IsTransientLE(err):
 		// LE radio momentarily unhappy. Just wait + retry; DO NOT purge.
 		// RemoveDevice here would wipe the cache we'd need when fresh
-		// discovery is also wedged (post-HCIDEVRESET, stuck LE scan).
+		// discovery is also unresponsive (post-HCIDEVRESET, stuck LE scan).
 		time.Sleep(500 * time.Millisecond)
 		if err := d.connectOnce(ctx); err != nil {
 			return fmt.Errorf("Connect (after transient-LE retry): %w", err)
@@ -282,7 +282,7 @@ func hintWrap(err error) error {
 	case strings.Contains(s, "Input/output error"):
 		return fmt.Errorf("%w (often: ATT MTU too high for this peripheral, or post-HCIDEVRESET stuck state. Try `caeruleus mtu --set 247` or `caeruleus adapter power cycle`)", err)
 	case strings.Contains(s, "not seen during discovery"):
-		return fmt.Errorf("%w (LE scan may be wedged; try `caeruleus adapter power cycle`)", err)
+		return fmt.Errorf("%w (LE scan may be unresponsive; try `caeruleus adapter power cycle`)", err)
 	case strings.Contains(s, "le-connection-abort-by-local"):
 		return fmt.Errorf("%w (peripheral aborted the LE link; the firmware may be holding a stale supervision-timeout window - try `caeruleus forget` then retry)", err)
 	}
@@ -320,7 +320,7 @@ func IsStuckConnect(err error) bool {
 // IsTransientLE matches errors that suggest the LE link / radio is
 // momentarily unhappy but BlueZ's tree is fine. Retry path: wait + retry,
 // keep the cached Device1 (purging it removes the only path we have when
-// fresh discovery is wedged - e.g. post-HCIDEVRESET).
+// fresh discovery is unresponsive - e.g. post-HCIDEVRESET).
 func IsTransientLE(err error) bool {
 	if err == nil {
 		return false

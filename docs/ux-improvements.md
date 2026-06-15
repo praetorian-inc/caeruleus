@@ -93,7 +93,7 @@ Add `--values` when you want the dump:
 
 ### 4. `disconnect` and `forget` subcommands
 
-**Why.** When a peripheral got wedged ("Connected=true but the link is
+**Why.** When a peripheral became unresponsive ("Connected=true but the link is
 dead" - what we hit after the bdaddr `HCIDEVRESET`), the only recovery
 paths were `dbus-send` incantations or restarting bluetoothd. Recovery
 should be a one-liner.
@@ -389,7 +389,7 @@ Compatibility:
   `--no-apply`. Behaviour unchanged.
 - New `caeruleus adapter power on|off|cycle` and `caeruleus adapter info`
   subcommands as the manual rescue when external tools or kernel resets
-  leave the controller wedged.
+  leave the controller unresponsive.
 
 This satisfies "the tool should never put the controller in the stuck
 state" - there's no longer any in-tree caller of HCIDEVRESET.
@@ -529,7 +529,7 @@ known to be nearby" - is testable.
 **Approach.** New helper `verifyLEHealthy(ctx, timeout)`: starts a
 discovery, waits up to `timeout` (default 3 s) for any `InterfacesAdded`
 or RSSI `PropertiesChanged` event. If nothing fires, return an error
-with the hint "LE scan appears wedged - try `caeruleus adapter power
+with the hint "LE scan appears unresponsive - try `caeruleus adapter power
 cycle`."
 
 Called automatically:
@@ -613,7 +613,7 @@ keeping the original wrapped via `%w` for programmatic consumers:
   MTU too high or post-HCIDEVRESET; try mtu --set 247 or adapter power
   cycle)`
 - `not seen during discovery` → `not seen during discovery (LE scan
-  may be wedged; try adapter power cycle)`
+  may be unresponsive; try adapter power cycle)`
 
 ---
 

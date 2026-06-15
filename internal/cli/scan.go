@@ -153,7 +153,7 @@ loop:
 		return emitJSON(list)
 	}
 	if len(list) == 0 {
-		// Distinguish "no devices in range" from "LE scan is wedged":
+		// Distinguish "no devices in range" from "LE scan is unresponsive":
 		// we counted the number of fresh PropertiesChanged/InterfacesAdded
 		// events; if zero across the whole window, the radio is the
 		// likely culprit and the user wants a different next step than
@@ -165,7 +165,7 @@ loop:
 			}
 		}
 		if freshSeen == 0 {
-			fmt.Println("no devices found (LE scan returned zero advertisement events - radio may be wedged; try: caeruleus adapter power cycle)")
+			fmt.Println("no devices found (LE scan returned zero advertisement events - radio may be unresponsive; try: caeruleus adapter power cycle)")
 		} else {
 			fmt.Println("no devices found")
 		}

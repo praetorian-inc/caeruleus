@@ -27,7 +27,7 @@ func newAssessWWRCmd() *cobra.Command {
      for resource exhaustion / queue overrun.
 
 Liveness is checked after each step by reading a known-readable handle. This
-is an active stress test: a vulnerable peripheral may reset or wedge. On the
+is an active stress test: a vulnerable peripheral may reset or become unresponsive. On the
 first detected crash, testing stops and the trigger is reported.`,
 		RunE: runAssessWWR,
 	}
