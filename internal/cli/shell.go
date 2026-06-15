@@ -240,7 +240,7 @@ func (sh *shell) run(ctx context.Context, line string) (quit bool) {
 		sh.cmdDisconnect()
 	case "pair":
 		sh.cmdPair(args)
-	case "unpair":
+	case "unpair", "forget", "rm", "remove":
 		sh.cmdUnpair()
 	case "primary":
 		sh.cmdPrimary()
