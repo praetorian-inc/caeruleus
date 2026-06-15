@@ -48,10 +48,13 @@ make test         # unit tests + shell tests
 
 | Group | Commands |
 |---|---|
-| Discovery / interaction | `scan`, `enumerate`, `primary`, `characteristics`, `read`, `write`, `raw-write`, `listen`, `cccd`, `mtu`, `pair`/`unpair`, `conn-params`, `disconnect`, `forget`, `shell`, `batch`, `serve`/`send` |
+| Discovery | `scan`, `enumerate`, `primary`, `characteristics` |
+| GATT operations | `read`, `write`, `raw-write`, `listen`, `cccd`, `mtu` |
+| Connection management | `pair`/`unpair`, `conn-params`, `disconnect`, `forget` |
+| Scripting & automation | `shell`, `batch`, `serve`/`send` |
 | Security assessment | `recon`, `assess check-auth`, `assess encryption`, `assess dfu`, `assess wwr` |
 | Fuzzing | `fuzz write` (incl. `--raw`), `fuzz replay` |
-| Adapter / diagnostics | `doctor`, `adapter`, `bdaddr`, `monitor` |
+| Adapter & diagnostics | `doctor`, `adapter`, `bdaddr`, `monitor` |
 
 Every command takes `-b/--bdaddr`, `-i/--adapter`, `-t/--timeout`, and `-o/--format text|json|jsonl`. Assessment commands emit `{address, test, summary, findings[]}` with per-finding `severity`/`handle`/`uuid`/`evidence`. See [`skills/caeruleus/SKILL.md`](skills/caeruleus/SKILL.md) for the full reference and the recommended assessment methodology.
 

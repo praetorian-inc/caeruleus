@@ -43,21 +43,33 @@ Add `-o json` to any command to get machine-readable output for scripting or rep
 
 ## Command reference
 
-### Discovery & interaction
+### Discovery
 | Command | Purpose |
 |---|---|
 | `scan [-t secs]` | LE discovery; `--new` hides cached devices. |
 | `enumerate -b A [--values] [--compact]` | Full GATT tree; `--values` reads each characteristic; `--compact` is one line/char. |
 | `primary -b A` / `characteristics -b A` | gatttool-style service / characteristic listing. |
+
+### GATT operations
+| Command | Purpose |
+|---|---|
 | `read -b A (-a 0xHND \| -u UUID) [--watch --every D] [--extract]` | Read; `--extract` emits bare hex for piping. |
 | `write -b A (-a 0xHND\|-u UUID) (-n HEX \| -s STR) [--req] [--each-line]` | Write; `--req` forces write-with-response. |
 | `raw-write -b A -a 0xHND (-n HEX \| --length N --pattern HH)` | Single-PDU ATT Write Request over raw L2CAP (oversized, bypasses BlueZ fragmentation; root). |
 | `listen -b A -a 0xHND [--trigger-value HEX] [--duration D]` | Subscribe to notifications/indications. |
 | `cccd -b A (--char UUID\|--handle 0xHND) --enable notify\|indicate\|off [--raw]` | Manipulate the CCCD directly. |
 | `mtu -b A --show` | Show negotiated ATT MTU (`--set N` reconfigures bluetoothd; root). |
+
+### Connection management
+| Command | Purpose |
+|---|---|
 | `pair -b A` / `unpair -b A` | Establish / drop a bond (pairing rejection is recorded, not an error). |
 | `conn-params -b A` | Connection interval / peripheral latency / supervision timeout + ATT MTU (root). |
 | `disconnect -b A` / `forget -b A` | Drop the link / purge BlueZ cache (clears stuck `Connected=true`). |
+
+### Scripting & automation
+| Command | Purpose |
+|---|---|
 | `shell -b A` / `batch -b A` / `serve`+`send` | Interactive REPL / stdin script / persistent warm-link daemon. |
 
 ### Security assessment (structured findings)
