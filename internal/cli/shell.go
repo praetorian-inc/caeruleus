@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bufio"
 	"context"
 	"encoding/hex"
 	"fmt"
@@ -46,6 +47,11 @@ type shell struct {
 	sessMu   sync.RWMutex
 	notifyMu sync.Mutex
 	notify   map[uint16]chan struct{} // active notification subscriptions
+
+	// scanList holds the addresses from the most recent `scan`, indexed by
+	// (display number - 1), so `connect <n>` can resolve the device shown at
+	// index n. Reset on each scan; nil until the first scan runs.
+	scanList []string
 }
 
 // sessSnap captures sh.s.tree under sessMu.RLock and returns the
@@ -201,6 +207,7 @@ func shellCompleter() readline.AutoCompleter {
 		readline.PcItem("help"),
 		readline.PcItem("quit"),
 		readline.PcItem("exit"),
+		readline.PcItem("scan"),
 		readline.PcItem("connect"),
 		readline.PcItem("disconnect"),
 		readline.PcItem("pair"),
@@ -234,6 +241,8 @@ func (sh *shell) run(ctx context.Context, line string) (quit bool) {
 		return true
 	case "help", "?":
 		printShellHelp(sh.errOut())
+	case "scan":
+		sh.cmdScan(ctx, args)
 	case "connect":
 		sh.cmdConnect(ctx, args)
 	case "disconnect":
@@ -278,7 +287,8 @@ func (sh *shell) run(ctx context.Context, line string) (quit bool) {
 
 func printShellHelp(w io.Writer) {
 	fmt.Fprintln(w, `commands:
-  connect [BDADDR]              connect to current or new device
+  scan [SECONDS]                live device discovery; no arg = scan until you press Enter
+  connect [BDADDR | #]          connect to a device by address, or by scan index (e.g. connect 3)
   disconnect                    drop the GATT link
   pair [PASSKEY]                bond with the device (PASSKEY for MITM devices);
                                 protected characteristics become readable after
@@ -380,10 +390,108 @@ func (sh *shell) ensureConnected() bool {
 	return true
 }
 
+// cmdScan runs live BLE discovery from inside the shell, rendering the same
+// self-updating LASTSEEN table as the top-level `scan --live` (in-place on a
+// terminal, append-only otherwise). `scan N` scans for N seconds; a bare
+// `scan` scans indefinitely until the user presses Enter.
+func (sh *shell) cmdScan(ctx context.Context, args []string) {
+	dur := time.Duration(0)
+	if len(args) >= 1 {
+		n, err := strconv.Atoi(args[0])
+		if err != nil || n <= 0 {
+			fmt.Fprintln(sh.errOut(), "usage: scan [seconds]   (no argument = scan until you press Enter)")
+			return
+		}
+		dur = time.Duration(n) * time.Second
+	}
+
+	interactive := sh.rl != nil && stdoutIsTTY()
+	// Without an interactive terminal there's no Enter to wait on, so an
+	// indefinite scan would never end. Require a duration in that case.
+	if dur == 0 && !interactive {
+		fmt.Fprintln(sh.errOut(), "scan: a duration is required without an interactive terminal, e.g. `scan 8`")
+		return
+	}
+
+	scanCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	// Bare `scan` runs until Enter. While this command runs no readline
+	// Readline() is active, so readline's input loop is parked and the tty
+	// is in canonical mode (see chzyer/readline Operation.Runes) - a direct
+	// stdin read here is safe and won't race readline. The goroutine only
+	// outlives the scan on shell shutdown (ctx cancel), where the process is
+	// exiting anyway.
+	var stop chan struct{}
+	footer := ""
+	if dur == 0 {
+		stop = make(chan struct{})
+		footer = "    [scanning — press Enter to stop]"
+		go func() {
+			r := bufio.NewReader(os.Stdin)
+			for {
+				b, err := r.ReadByte()
+				if err != nil || b == '\n' || b == '\r' {
+					close(stop)
+					return
+				}
+			}
+		}()
+	}
+
+	seen, order, err := runLiveScan(scanCtx, sh.s.conn, liveScanConfig{
+		duration: dur,
+		out:      sh.stdOut(),
+		live:     true,
+		inPlace:  interactive,
+		footer:   footer,
+		stop:     stop,
+	})
+	if err != nil {
+		fmt.Fprintln(sh.errOut(), "scan:", err)
+		return
+	}
+	// Remember the displayed order so `connect <n>` can resolve an index.
+	sh.scanList = make([]string, len(order))
+	for i, p := range order {
+		sh.scanList[i] = seen[p].Address
+	}
+	fmt.Fprintf(sh.errOut(), "[+] scan complete: %d device(s) - connect <#> to connect by index\n", len(order))
+}
+
+// resolveConnectTarget maps a `connect` argument to a BD_ADDR. A bare positive
+// integer is treated as a 1-based index into the most recent scan (`list`); any
+// other token is taken as a literal address. Returns isIndex=true when the
+// token was numeric (so the caller knows not to fall through to address
+// parsing), and a non-empty errMsg when a numeric token can't be resolved
+// (no scan yet, or out of range).
+func resolveConnectTarget(list []string, tok string) (addr string, isIndex bool, errMsg string) {
+	n, err := strconv.Atoi(tok)
+	if err != nil {
+		return "", false, ""
+	}
+	if len(list) == 0 {
+		return "", true, "no scan results yet - run `scan` first, then `connect <#>`"
+	}
+	if n < 1 || n > len(list) {
+		return "", true, fmt.Sprintf("index %d out of range (last scan found %d device(s))", n, len(list))
+	}
+	return list[n-1], true, ""
+}
+
 func (sh *shell) cmdConnect(ctx context.Context, args []string) {
 	addr := ""
 	if len(args) > 0 {
-		addr = strings.ToUpper(args[0])
+		if resolved, isIndex, errMsg := resolveConnectTarget(sh.scanList, args[0]); isIndex {
+			if errMsg != "" {
+				fmt.Fprintln(sh.errOut(), errMsg)
+				return
+			}
+			addr = resolved
+			fmt.Fprintf(sh.errOut(), "connecting to #%s %s\n", args[0], addr)
+		} else {
+			addr = strings.ToUpper(args[0])
+		}
 	}
 	if addr != "" {
 		if !validMAC(addr) {

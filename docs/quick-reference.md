@@ -10,7 +10,7 @@ If you already use another BLE tool, jump to the row that matches your habit.
 
 | If you reach for... | for... | Try in caeruleus |
 |---|---|---|
-| `bettercap` `ble.recon` | finding devices | `caeruleus scan` |
+| `bettercap` `ble.recon` | finding devices (live-updating list) | `caeruleus scan --live` (streams found/updated devices; `-o jsonl` for one event/line) |
 | `hcitool lescan` | LE device discovery | `caeruleus scan` (add `-t <secs>` for the window) |
 | `bettercap` `ble.enum <mac>` | listing services/chars | `caeruleus enumerate -b <mac> --values` |
 | `gatttool -I` / `-b <mac> -I` | an interactive session | `caeruleus shell -b <mac>` |
