@@ -471,7 +471,7 @@ func (sh *shell) cmdEnumerate() {
 	if !sh.ensureConnected() {
 		return
 	}
-	rows := buildEnumRows(sh.s)
+	rows := buildEnumRows(sh.s, true)
 	for _, r := range rows {
 		fmt.Fprintf(sh.stdOut(), "0x%04x  %s  [%s]\n", r.CharHandle, r.CharUUID, r.Properties)
 		if r.ValueHex != "" {
