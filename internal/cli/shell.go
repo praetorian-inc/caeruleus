@@ -404,8 +404,27 @@ func (sh *shell) cmdConnect(ctx context.Context, args []string) {
 	}
 	timeout := time.Duration(root.timeout) * time.Second
 	t0 := time.Now()
-	if err := sh.s.device.Connect(ctx, timeout); err != nil {
-		fmt.Fprintln(sh.errOut(), "connect:", err)
+	connectErr := sh.s.device.Connect(ctx, timeout)
+
+	// A stale Device1 left by a prior link-only pair (or a poisoned
+	// security elevation) can make Connect hang on ServicesResolved or
+	// return an empty GATT tree. When the first Connect fails or yields
+	// 0 services, purge the Device1 and retry from scratch. RemoveDevice
+	// drops any stored bond, but a stuck Device1 is unusable anyway.
+	if connectErr != nil && isServicesResolvedTimeout(connectErr) {
+		logf("ServicesResolved timeout; purging stale Device1 for fresh discovery")
+		addr := sh.shellDeviceAddr()
+		_ = sh.s.device.Disconnect()
+		_ = sh.s.conn.RemoveDevice(sh.s.device.Path)
+		time.Sleep(300 * time.Millisecond)
+		sh.s.device = sh.s.conn.Device(addr)
+		if root.addrType != "" {
+			_ = sh.s.device.SetAddressType(root.addrType)
+		}
+		connectErr = sh.s.device.Connect(ctx, timeout)
+	}
+	if connectErr != nil {
+		fmt.Fprintln(sh.errOut(), "connect:", connectErr)
 		return
 	}
 	tree, err := sh.s.conn.EnumerateGatt(sh.s.device.Path)
@@ -414,38 +433,24 @@ func (sh *shell) cmdConnect(ctx context.Context, args []string) {
 		return
 	}
 
-	// BlueZ can report ServicesResolved=true while returning an empty GATT
-	// cache — typically after a link-only pair leaves a Device1 object with
-	// no cached attribute table. Disconnect and retry to trigger fresh GATT
-	// discovery; if that still fails, purge the Device1 (which drops any
-	// stored bond) as a last resort.
 	if len(tree.Services) == 0 {
-		logf("empty GATT cache after connect; disconnecting for fresh discovery")
+		logf("empty GATT cache after connect; purging Device1 for fresh discovery")
+		addr := sh.shellDeviceAddr()
 		_ = sh.s.device.Disconnect()
-		time.Sleep(500 * time.Millisecond)
-		if err := sh.s.device.Connect(ctx, timeout); err == nil {
-			tree, err = sh.s.conn.EnumerateGatt(sh.s.device.Path)
+		_ = sh.s.conn.RemoveDevice(sh.s.device.Path)
+		time.Sleep(300 * time.Millisecond)
+		sh.s.device = sh.s.conn.Device(addr)
+		if root.addrType != "" {
+			_ = sh.s.device.SetAddressType(root.addrType)
 		}
-		if err != nil || len(tree.Services) == 0 {
-			logf("retry still empty; purging Device1 (bond will be lost)")
-			fmt.Fprintln(sh.errOut(), "stale GATT cache — purging device state (bond dropped)")
-			addr := sh.shellDeviceAddr()
-			_ = sh.s.device.Disconnect()
-			_ = sh.s.conn.RemoveDevice(sh.s.device.Path)
-			time.Sleep(300 * time.Millisecond)
-			sh.s.device = sh.s.conn.Device(addr)
-			if root.addrType != "" {
-				_ = sh.s.device.SetAddressType(root.addrType)
-			}
-			if err := sh.s.device.Connect(ctx, timeout); err != nil {
-				fmt.Fprintln(sh.errOut(), "connect (retry after purge):", err)
-				return
-			}
-			tree, err = sh.s.conn.EnumerateGatt(sh.s.device.Path)
-			if err != nil {
-				fmt.Fprintln(sh.errOut(), "enumerate (retry after purge):", err)
-				return
-			}
+		if err := sh.s.device.Connect(ctx, timeout); err != nil {
+			fmt.Fprintln(sh.errOut(), "connect (retry after purge):", err)
+			return
+		}
+		tree, err = sh.s.conn.EnumerateGatt(sh.s.device.Path)
+		if err != nil {
+			fmt.Fprintln(sh.errOut(), "enumerate (retry after purge):", err)
+			return
 		}
 	}
 
@@ -486,6 +491,16 @@ func (sh *shell) shellDeviceAddr() string {
 	}
 	p = strings.TrimPrefix(p, "/org/bluez/"+root.adapter+"/dev_")
 	return strings.ReplaceAll(p, "_", ":")
+}
+
+// isServicesResolvedTimeout returns true when a Connect error is specifically
+// a ServicesResolved timeout — the ACL link came up but GATT discovery never
+// completed, typically because a stale Device1 object confused BlueZ.
+func isServicesResolvedTimeout(err error) bool {
+	if err == nil {
+		return false
+	}
+	return strings.Contains(err.Error(), "waiting for ServicesResolved")
 }
 
 // isLinkPoisoned returns true when a read/write error looks like a failed
