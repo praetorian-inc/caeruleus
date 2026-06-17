@@ -11,7 +11,7 @@ import (
 	"github.com/jedib0t/go-pretty/v6/text"
 	"github.com/spf13/cobra"
 
-	"caeruleus/internal/bluez"
+	"github.com/praetorian-inc/caeruleus/internal/bluez"
 )
 
 var enumerateFlags struct {

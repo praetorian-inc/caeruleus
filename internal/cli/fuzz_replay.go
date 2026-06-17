@@ -7,8 +7,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"caeruleus/internal/fuzz/corpus"
-	"caeruleus/internal/fuzz/engine"
+	"github.com/praetorian-inc/caeruleus/internal/fuzz/corpus"
+	"github.com/praetorian-inc/caeruleus/internal/fuzz/engine"
 )
 
 var fuzzReplayFlags struct {

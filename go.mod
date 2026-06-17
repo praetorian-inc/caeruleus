@@ -1,4 +1,4 @@
-module caeruleus
+module github.com/praetorian-inc/caeruleus
 
 go 1.25.3
 

@@ -9,7 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"caeruleus/internal/bluez"
+	"github.com/praetorian-inc/caeruleus/internal/bluez"
 )
 
 // pairAttempt captures the outcome of one connect+Pair cycle. pairErr is the

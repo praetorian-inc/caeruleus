@@ -9,7 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"caeruleus/internal/smp"
+	"github.com/praetorian-inc/caeruleus/internal/smp"
 )
 
 func newAssessPairingCmd() *cobra.Command {

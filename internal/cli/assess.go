@@ -12,7 +12,7 @@ import (
 	"github.com/praetorian-inc/titus"
 	"github.com/spf13/cobra"
 
-	"caeruleus/internal/bluez"
+	"github.com/praetorian-inc/caeruleus/internal/bluez"
 )
 
 // Severity grades a finding. Ordering (low->high) drives sorted output.

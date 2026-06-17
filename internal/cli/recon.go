@@ -9,7 +9,7 @@ import (
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/spf13/cobra"
 
-	"caeruleus/internal/bluez"
+	"github.com/praetorian-inc/caeruleus/internal/bluez"
 )
 
 // deviceProfile is the passive identity recovered from advertising + GATT.

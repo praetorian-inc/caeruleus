@@ -10,10 +10,10 @@ import (
 	"strings"
 	"time"
 
-	bdaddrPkg "caeruleus/internal/bdaddr"
-	"caeruleus/internal/fuzz/engine"
-	"caeruleus/internal/fuzz/oracle"
-	"caeruleus/internal/l2cap"
+	bdaddrPkg "github.com/praetorian-inc/caeruleus/internal/bdaddr"
+	"github.com/praetorian-inc/caeruleus/internal/fuzz/engine"
+	"github.com/praetorian-inc/caeruleus/internal/fuzz/oracle"
+	"github.com/praetorian-inc/caeruleus/internal/l2cap"
 )
 
 // l2capHarness drives writes through a raw L2CAP/ATT socket and runs

@@ -6,7 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"caeruleus/internal/bdaddr"
+	"github.com/praetorian-inc/caeruleus/internal/bdaddr"
 )
 
 var bdaddrFlags struct {

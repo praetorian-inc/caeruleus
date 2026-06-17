@@ -17,7 +17,7 @@ import (
 	"github.com/jedib0t/go-pretty/v6/text"
 	"golang.org/x/sys/unix"
 
-	"caeruleus/internal/bluez"
+	"github.com/praetorian-inc/caeruleus/internal/bluez"
 )
 
 // session bundles a connected device + its discovered GATT tree.

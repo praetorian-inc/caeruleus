@@ -7,8 +7,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	bdaddrPkg "caeruleus/internal/bdaddr"
-	"caeruleus/internal/l2cap"
+	bdaddrPkg "github.com/praetorian-inc/caeruleus/internal/bdaddr"
+	"github.com/praetorian-inc/caeruleus/internal/l2cap"
 )
 
 var cccdFlags struct {

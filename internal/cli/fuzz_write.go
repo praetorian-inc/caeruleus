@@ -15,12 +15,12 @@ import (
 	"github.com/godbus/dbus/v5"
 	"github.com/spf13/cobra"
 
-	"caeruleus/internal/bluez"
-	"caeruleus/internal/fuzz/corpus"
-	"caeruleus/internal/fuzz/engine"
-	"caeruleus/internal/fuzz/mutate"
-	"caeruleus/internal/fuzz/oracle"
-	"caeruleus/internal/fuzz/trace"
+	"github.com/praetorian-inc/caeruleus/internal/bluez"
+	"github.com/praetorian-inc/caeruleus/internal/fuzz/corpus"
+	"github.com/praetorian-inc/caeruleus/internal/fuzz/engine"
+	"github.com/praetorian-inc/caeruleus/internal/fuzz/mutate"
+	"github.com/praetorian-inc/caeruleus/internal/fuzz/oracle"
+	"github.com/praetorian-inc/caeruleus/internal/fuzz/trace"
 )
 
 var fuzzWriteFlags struct {

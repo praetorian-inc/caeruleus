@@ -8,7 +8,7 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
-	"caeruleus/internal/bluez"
+	"github.com/praetorian-inc/caeruleus/internal/bluez"
 )
 
 // errLEScanUnresponsive is returned by verifyLEHealthy when an active

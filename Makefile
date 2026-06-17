@@ -6,10 +6,15 @@ CAERULEUS := ./caeruleus
 HARNESS   := ./shell-harness
 ADDR      ?=
 
-.PHONY: build harness test test-unit test-shell test-shell-device clean
+.PHONY: build install harness test test-unit test-shell test-shell-device clean
 
 build:
 	go build -o $(CAERULEUS) ./cmd/caeruleus
+
+# Install the caeruleus binary onto $PATH (into $GOBIN, else $GOPATH/bin).
+# Equivalent to: go install github.com/praetorian-inc/caeruleus/cmd/caeruleus@latest
+install:
+	go install ./cmd/caeruleus
 
 harness:
 	go build -o $(HARNESS) ./cmd/shell-harness
