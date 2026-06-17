@@ -95,7 +95,7 @@ All emit `{address, test, summary, findings[]}`; findings carry `severity` (info
 
 ## Assessment methodology
 
-Run in order, capturing each step's JSON, then synthesize. Each command's `-o json` output is the single source of truth — read and parse it directly. Never re-run a command without `-o json` to see a "human-readable version"; the data is identical and the BLE round-trip is wasted. If a step wedges the device, run `disconnect` / `forget` or `adapter power cycle` before continuing.
+Run in order, capturing each step's JSON, then synthesize. Each command's `-o json` output is the single source of truth — read and parse it directly. Never re-run a command without `-o json` to see a "human-readable version"; the data is identical and the BLE round-trip is wasted. If a step locks up the device, run `disconnect` / `forget` or `adapter power cycle` before continuing.
 
 ```bash
 A=AA:BB:CC:DD:EE:FF
