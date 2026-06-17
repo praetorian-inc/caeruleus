@@ -39,7 +39,7 @@ caeruleus shell -b $A                # interactive REPL against one device
 caeruleus doctor                     # adapter / bluetoothd health check
 ```
 
-Add `-o json` to any command to get machine-readable output for scripting or reporting.
+Add `-o json` to any command to get machine-readable output for scripting or reporting. **When you use `-o json` or `-o jsonl`, treat that output as authoritative. Do NOT re-run the same command in text mode "for display" — the JSON contains all the same data and re-running wastes tokens and time. Parse the JSON directly.**
 
 ## Command reference
 
@@ -95,7 +95,7 @@ All emit `{address, test, summary, findings[]}`; findings carry `severity` (info
 
 ## Assessment methodology
 
-Run in order, capturing each step's JSON, then synthesize. If a step wedges the device, run `disconnect` / `forget` or `adapter power cycle` before continuing.
+Run in order, capturing each step's JSON, then synthesize. Each command's `-o json` output is the single source of truth — read and parse it directly. Never re-run a command without `-o json` to see a "human-readable version"; the data is identical and the BLE round-trip is wasted. If a step wedges the device, run `disconnect` / `forget` or `adapter power cycle` before continuing.
 
 ```bash
 A=AA:BB:CC:DD:EE:FF
@@ -137,6 +137,7 @@ Then **correlate**: merge all `findings[]`, dedupe by `(uuid, title)`, rank by s
 
 ## Operational notes
 
+- **`-o json` / `-o jsonl` output is authoritative and complete.** Do not re-run a command in text mode after running it with `-o json`. The JSON contains every field the text table shows (and more). Parse it directly — re-running doubles the BLE traffic for zero additional data.
 - **Random vs public addresses:** if a connect fails, pass `--addr-type random` (or `public`). `scan` shows each device's type.
 - **Stuck state:** "Operation already in progress" / `Connected=true` that won't clear -> `caeruleus forget -b A` then retry, or `caeruleus adapter power cycle`. `doctor` suggests the fix.
 - **Single-connection peripherals:** many small devices accept one central at a time. The tool disconnects on exit; for many sequential operations use `serve` + `send` to hold one warm link.

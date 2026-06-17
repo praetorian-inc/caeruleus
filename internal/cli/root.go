@@ -54,7 +54,7 @@ mtu --set/--reset) require root.`
 	// --addr-type lost its -t short form to --timeout (org-wide convention).
 	pf.StringVar(&root.addrType, "addr-type", "", "address type: public | random (auto if blank)")
 	pf.IntVarP(&root.timeout, "timeout", "t", 25, "operation timeout, seconds")
-	pf.StringVarP(&root.format, "format", "o", "text", "output format: text | json | jsonl")
+	pf.StringVarP(&root.format, "format", "o", "text", "output format: text | json | jsonl (json/jsonl output is authoritative; do not re-run in text mode)")
 	// --json is kept as a deprecated alias for --format jsonl. Hidden so
 	// the help output points users at the canonical -o/--format flag.
 	pf.BoolVar(&root.jsonShim, "json", false, "deprecated alias for --format jsonl")
