@@ -3,7 +3,6 @@ package cli
 import (
 	"encoding/hex"
 	"fmt"
-	"os"
 	"sort"
 	"strings"
 	"unicode"
@@ -95,8 +94,7 @@ func runEnumerate(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	t := table.NewWriter()
-	t.SetOutputMirror(os.Stdout)
+	t := newTable()
 	t.AppendHeader(table.Row{"SVC HND", "CHR HND", "CHR UUID", "PROPS", "HEX", "ASCII"})
 
 	// On a real terminal, bound the wide columns so the rendered box never

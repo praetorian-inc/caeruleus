@@ -13,6 +13,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jedib0t/go-pretty/v6/table"
+	"github.com/jedib0t/go-pretty/v6/text"
 	"golang.org/x/sys/unix"
 
 	"caeruleus/internal/bluez"
@@ -354,6 +356,32 @@ func retryable(retry int, delay time.Duration, op func() error) error {
 		}
 	}
 	return err
+}
+
+// newTable returns a table.Writer with a borderless, space-padded style
+// so that individual cell values (MAC addresses, handles, UUIDs) are
+// double-click-selectable in terminals like Ghostty, iTerm2, and gnome-terminal.
+func newTable() table.Writer {
+	t := table.NewWriter()
+	t.SetOutputMirror(os.Stdout)
+	t.SetStyle(table.Style{
+		Name: "copy-friendly",
+		Box: table.BoxStyle{
+			MiddleHorizontal: "-",
+			PaddingLeft:      "",
+			PaddingRight:     "  ",
+		},
+		Format: table.FormatOptions{
+			Header: text.FormatUpper,
+		},
+		Options: table.Options{
+			DrawBorder:      false,
+			SeparateColumns: false,
+			SeparateHeader:  true,
+			SeparateRows:    false,
+		},
+	})
+	return t
 }
 
 // drainConnectedPeripherals walks every Device1 reported by BlueZ on the

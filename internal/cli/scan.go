@@ -3,7 +3,6 @@ package cli
 import (
 	"context"
 	"fmt"
-	"os"
 	"sort"
 	"strings"
 	"time"
@@ -171,8 +170,7 @@ loop:
 		}
 		return nil
 	}
-	t := table.NewWriter()
-	t.SetOutputMirror(os.Stdout)
+	t := newTable()
 	t.AppendHeader(table.Row{"ADDRESS", "TYPE", "RSSI", "NAME"})
 	for _, di := range list {
 		name := di.Name
