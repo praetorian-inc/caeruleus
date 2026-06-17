@@ -1,6 +1,38 @@
 package cli
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
+
+func TestParseScanDuration(t *testing.T) {
+	cases := []struct {
+		name        string
+		args        []string
+		interactive bool
+		wantDur     time.Duration
+		wantErr     bool // expect a non-empty errMsg
+	}{
+		{"positive integer", []string{"8"}, true, 8 * time.Second, false},
+		{"positive integer without a terminal is fine", []string{"8"}, false, 8 * time.Second, false},
+		{"zero is rejected", []string{"0"}, true, 0, true},
+		{"negative is rejected", []string{"-3"}, true, 0, true},
+		{"non-numeric is rejected", []string{"abc"}, true, 0, true},
+		{"no arg with terminal allows indefinite", nil, true, 0, false},
+		{"no arg without terminal requires a duration", nil, false, 0, true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			dur, errMsg := parseScanDuration(tc.args, tc.interactive)
+			if gotErr := errMsg != ""; gotErr != tc.wantErr {
+				t.Errorf("errMsg = %q (err=%v), want err=%v", errMsg, gotErr, tc.wantErr)
+			}
+			if dur != tc.wantDur {
+				t.Errorf("dur = %v, want %v", dur, tc.wantDur)
+			}
+		})
+	}
+}
 
 func TestResolveConnectTarget(t *testing.T) {
 	list := []string{"AA:AA:AA:AA:AA:01", "BB:BB:BB:BB:BB:02", "CC:CC:CC:CC:CC:03"}

@@ -92,9 +92,15 @@ func runScan(cmd *cobra.Command, args []string) error {
 	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
 	defer signal.Stop(sigCh)
 	go func() {
-		if _, ok := <-sigCh; ok {
-			cancel()
-		}
+		<-sigCh
+		cancel()
+		// A second signal hard-exits: if the deferred BlueZ teardown
+		// (StopDiscovery / filter reset) wedges on an unresponsive
+		// bluetoothd - most likely during an unbounded --live scan - the
+		// user can still escalate Ctrl-C instead of having to SIGKILL from
+		// another terminal.
+		<-sigCh
+		os.Exit(130)
 	}()
 
 	conn, err := bluez.Dial(root.adapter)
@@ -180,16 +186,8 @@ func runScan(cmd *cobra.Command, args []string) error {
 	t := newTable()
 	t.AppendHeader(table.Row{"ADDRESS", "TYPE", "RSSI", "DEVICE", "NAME"})
 	for _, di := range list {
-		name := di.Name
-		if name == "" {
-			name = di.Alias
-		}
-		rssi := ""
-		if di.RSSI != 0 {
-			rssi = fmt.Sprintf("%d", di.RSSI)
-		}
 		devType := inferDeviceType(di.Appearance, di.UUIDs)
-		t.AppendRow(table.Row{di.Address, di.AddrType, rssi, devType, name})
+		t.AppendRow(table.Row{di.Address, di.AddrType, rssiStr(di.RSSI), devType, displayName(di)})
 	}
 	t.Render()
 	return nil
@@ -213,6 +211,42 @@ type liveScanConfig struct {
 	jsonMode   bool                        // emit discrete JSON events instead of a table
 	footer     string                      // optional line under the in-place table
 	stop       <-chan struct{}             // external stop (e.g. Enter pressed); nil = none
+}
+
+// indexer assigns each device path a stable 1-based index in first-seen order,
+// so order[i] is the device shown at index i+1 (matching the live table column
+// and the shell's `connect <n>`). Observe is idempotent per path.
+type indexer struct {
+	order []dbus.ObjectPath
+	idxOf map[dbus.ObjectPath]int
+}
+
+func newIndexer() *indexer {
+	return &indexer{idxOf: map[dbus.ObjectPath]int{}}
+}
+
+// Observe records a sighting of path and returns its 1-based index. firstSeen
+// is true only the first time a given path is observed; repeats return the
+// original index and never grow order.
+func (ix *indexer) Observe(path dbus.ObjectPath) (idx int, firstSeen bool) {
+	if i, ok := ix.idxOf[path]; ok {
+		return i, false
+	}
+	ix.order = append(ix.order, path)
+	i := len(ix.order)
+	ix.idxOf[path] = i
+	return i, true
+}
+
+// classify decides what a PropertiesChanged event on an already-tracked device
+// means: "update" when a rendered field (RSSI/Name/AddrType) actually changed,
+// "" (no event) when the re-observation is identical. The "found" case for a
+// never-seen device is handled by the caller.
+func classify(prev, next bluez.DeviceInfo) string {
+	if next.RSSI != prev.RSSI || next.Name != prev.Name || next.AddrType != prev.AddrType {
+		return "update"
+	}
+	return ""
 }
 
 // runLiveScan runs LE discovery and returns every device seen plus the paths
@@ -268,8 +302,7 @@ func runLiveScan(ctx context.Context, conn *bluez.Conn, cfg liveScanConfig) (map
 	// so a pure event-driven scan misses them. --new opts back into
 	// event-only mode.
 	seen := map[dbus.ObjectPath]bluez.DeviceInfo{}
-	var order []dbus.ObjectPath                 // device paths in first-seen order, for stable rows
-	idxOf := map[dbus.ObjectPath]int{}          // path -> 1-based index (== position in order)
+	ix := newIndexer()                          // device paths in first-seen order, for stable rows
 	lastSeen := map[dbus.ObjectPath]time.Time{} // most recent observation per device
 	liveLines := 0                              // table lines (incl. header/footer) currently on screen
 
@@ -280,15 +313,7 @@ func runLiveScan(ctx context.Context, conn *bluez.Conn, cfg liveScanConfig) (map
 		return t.Format("15:04:05")
 	}
 	deviceRow := func(prefix, idx string, di bluez.DeviceInfo, seenAt time.Time) string {
-		name := di.Name
-		if name == "" {
-			name = di.Alias
-		}
-		rssi := ""
-		if di.RSSI != 0 {
-			rssi = fmt.Sprintf("%d", di.RSSI)
-		}
-		return prefix + fmt.Sprintf(liveRowFmt, idx, di.Address, di.AddrType, rssi, fmtSeen(seenAt), name)
+		return prefix + fmt.Sprintf(liveRowFmt, idx, di.Address, di.AddrType, rssiStr(di.RSSI), fmtSeen(seenAt), displayName(di))
 	}
 	header := "    " + fmt.Sprintf(liveRowFmt, "#", "ADDRESS", "TYPE", "RSSI", "LASTSEEN", "NAME")
 
@@ -302,7 +327,7 @@ func runLiveScan(ctx context.Context, conn *bluez.Conn, cfg liveScanConfig) (map
 		liveLines = 0
 		draw := func(s string) { fmt.Fprintf(out, "%s\033[K\n", s); liveLines++ }
 		draw(header)
-		for i, p := range order {
+		for i, p := range ix.order {
 			draw(deviceRow("    ", strconv.Itoa(i+1), seen[p], lastSeen[p]))
 		}
 		if cfg.footer != "" {
@@ -319,19 +344,10 @@ func runLiveScan(ctx context.Context, conn *bluez.Conn, cfg liveScanConfig) (map
 			return
 		}
 		lastSeen[di.Path] = when
-		idx, known := idxOf[di.Path]
-		if !known {
-			order = append(order, di.Path)
-			idx = len(order)
-			idxOf[di.Path] = idx
-		}
+		idx, _ := ix.Observe(di.Path)
 		switch {
 		case cfg.jsonMode:
-			name := di.Name
-			if name == "" {
-				name = di.Alias
-			}
-			_ = emitJSONEvent(scanEvent{Event: kind, Index: idx, Address: di.Address, AddrType: di.AddrType, RSSI: di.RSSI, Name: name})
+			_ = emitJSONEvent(scanEvent{Event: kind, Index: idx, Address: di.Address, AddrType: di.AddrType, RSSI: di.RSSI, Name: deviceName(di)})
 		case cfg.inPlace:
 			redraw()
 		default: // append-only text: one line per event
@@ -374,11 +390,11 @@ func runLiveScan(ctx context.Context, conn *bluez.Conn, cfg liveScanConfig) (map
 	for {
 		select {
 		case <-deadline:
-			return seen, order, nil
+			return seen, ix.order, nil
 		case <-cfg.stop:
-			return seen, order, nil
+			return seen, ix.order, nil
 		case <-ctx.Done():
-			return seen, order, nil
+			return seen, ix.order, nil
 		case ev := <-addCh:
 			if props, ok := ev.Interfaces[bluez.IfaceDevice]; ok {
 				di := propsToDevice(ev.Path, props)
@@ -398,17 +414,62 @@ func runLiveScan(ctx context.Context, conn *bluez.Conn, cfg liveScanConfig) (map
 			if !existed {
 				di = bluez.DeviceInfo{Path: ev.Path}
 			}
-			prevRSSI, prevName, prevType := di.RSSI, di.Name, di.AddrType
+			prev := di
 			updateDevice(&di, ev.Changed)
 			seen[ev.Path] = di
-			switch {
-			case !existed:
+			if !existed {
 				emit(di, "found", time.Now())
-			case di.RSSI != prevRSSI || di.Name != prevName || di.AddrType != prevType:
-				emit(di, "update", time.Now())
+			} else if kind := classify(prev, di); kind != "" {
+				emit(di, kind, time.Now())
 			}
 		}
 	}
+}
+
+// deviceName picks the human label for a device, preferring the advertised
+// Name over the BlueZ Alias fallback. The result is raw, device-advertised
+// text; terminal render paths must scrub it first (use displayName).
+func deviceName(di bluez.DeviceInfo) string {
+	if di.Name != "" {
+		return di.Name
+	}
+	return di.Alias
+}
+
+// displayName is deviceName scrubbed for safe terminal rendering. BLE names are
+// advertised by the peripheral and so are attacker-controlled; printing them
+// verbatim would let an in-range advertiser inject ANSI/control sequences into
+// the operator's terminal (cursor moves, screen clears, OSC title/clipboard, or
+// corruption of the in-place redraw line accounting).
+func displayName(di bluez.DeviceInfo) string {
+	return sanitizeTerminal(deviceName(di))
+}
+
+// sanitizeTerminal drops C0 control bytes (including ESC 0x1b, the introducer
+// for every CSI/OSC escape sequence) and DEL, so device-supplied text can't
+// start a terminal escape sequence. Printable ASCII and any rune >= 0x20
+// (UTF-8 glyphs) pass through unchanged.
+func sanitizeTerminal(s string) string {
+	if s == "" {
+		return s
+	}
+	var b strings.Builder
+	b.Grow(len(s))
+	for _, r := range s {
+		if r < 0x20 || r == 0x7f {
+			continue
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
+}
+
+// rssiStr renders an RSSI for a table cell, leaving it blank when unknown (0).
+func rssiStr(rssi int16) string {
+	if rssi == 0 {
+		return ""
+	}
+	return strconv.Itoa(int(rssi))
 }
 
 // stdoutIsTTY reports whether stdout is an interactive terminal. Used to gate

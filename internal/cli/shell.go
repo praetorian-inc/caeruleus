@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"bufio"
 	"context"
 	"encoding/hex"
 	"fmt"
@@ -390,26 +389,34 @@ func (sh *shell) ensureConnected() bool {
 	return true
 }
 
+// parseScanDuration interprets the optional `scan N` argument. A bare `scan`
+// (no args) yields dur==0, meaning "scan until stopped" - only allowed with an
+// interactive terminal, since there's otherwise no Enter to stop on. A non-
+// numeric or non-positive N, or a no-arg call without a terminal, returns a
+// non-empty errMsg the caller should print.
+func parseScanDuration(args []string, interactive bool) (dur time.Duration, errMsg string) {
+	if len(args) >= 1 {
+		n, err := strconv.Atoi(args[0])
+		if err != nil || n <= 0 {
+			return 0, "usage: scan [seconds]   (no argument = scan until you press Enter)"
+		}
+		return time.Duration(n) * time.Second, ""
+	}
+	if !interactive {
+		return 0, "scan: a duration is required without an interactive terminal, e.g. `scan 8`"
+	}
+	return 0, ""
+}
+
 // cmdScan runs live BLE discovery from inside the shell, rendering the same
 // self-updating LASTSEEN table as the top-level `scan --live` (in-place on a
 // terminal, append-only otherwise). `scan N` scans for N seconds; a bare
 // `scan` scans indefinitely until the user presses Enter.
 func (sh *shell) cmdScan(ctx context.Context, args []string) {
-	dur := time.Duration(0)
-	if len(args) >= 1 {
-		n, err := strconv.Atoi(args[0])
-		if err != nil || n <= 0 {
-			fmt.Fprintln(sh.errOut(), "usage: scan [seconds]   (no argument = scan until you press Enter)")
-			return
-		}
-		dur = time.Duration(n) * time.Second
-	}
-
 	interactive := sh.rl != nil && stdoutIsTTY()
-	// Without an interactive terminal there's no Enter to wait on, so an
-	// indefinite scan would never end. Require a duration in that case.
-	if dur == 0 && !interactive {
-		fmt.Fprintln(sh.errOut(), "scan: a duration is required without an interactive terminal, e.g. `scan 8`")
+	dur, errMsg := parseScanDuration(args, interactive)
+	if errMsg != "" {
+		fmt.Fprintln(sh.errOut(), errMsg)
 		return
 	}
 
@@ -428,10 +435,19 @@ func (sh *shell) cmdScan(ctx context.Context, args []string) {
 		stop = make(chan struct{})
 		footer = "    [scanning — press Enter to stop]"
 		go func() {
-			r := bufio.NewReader(os.Stdin)
+			// Read one byte at a time directly from stdin rather than via a
+			// bufio.Reader: bufio reads ahead and would pull a command typed
+			// right after the stop-Enter into its throwaway buffer, dropping
+			// it before readline resumes. Reading the raw fd stops exactly at
+			// the newline, leaving any following input for readline.
+			var b [1]byte
 			for {
-				b, err := r.ReadByte()
-				if err != nil || b == '\n' || b == '\r' {
+				n, err := os.Stdin.Read(b[:])
+				if err != nil {
+					close(stop)
+					return
+				}
+				if n == 1 && (b[0] == '\n' || b[0] == '\r') {
 					close(stop)
 					return
 				}
@@ -448,6 +464,10 @@ func (sh *shell) cmdScan(ctx context.Context, args []string) {
 		stop:     stop,
 	})
 	if err != nil {
+		// A failed scan must clear the remembered order; otherwise a later
+		// `connect <n>` would silently resolve against a previous scan's
+		// devices (the field comment promises "Reset on each scan").
+		sh.scanList = nil
 		fmt.Fprintln(sh.errOut(), "scan:", err)
 		return
 	}
