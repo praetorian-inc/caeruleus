@@ -17,7 +17,7 @@ func newAssessCheckAuthCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:     "check-auth",
 		Aliases: []string{"auth-bypass"},
-		Short:   "What an unpaired attacker can read (and optionally write) on -b BDADDR",
+		Short:   "Read-only by default: what an unpaired attacker can read on -b BDADDR (add --probe-write for write checks)",
 		Long: `Drops any existing bond, connects unauthenticated, and attempts to read
 every characteristic - classifying each as readable-without-auth,
 auth-required, denied, or error. Read values are scanned with Praetorian
@@ -42,6 +42,12 @@ func runCheckAuth(cmd *cobra.Command, args []string) error {
 	}
 	ctx, cancel := ctxWithRootTimeout()
 	defer cancel()
+
+	if checkAuthFlags.probeWrite {
+		statusf("check-auth: read + write probes (--probe-write)")
+	} else {
+		statusf("check-auth: read-only (add --probe-write to also test writes)")
+	}
 
 	// Guarantee an unauthenticated context: purge any stored bond so the
 	// link below is unencrypted. Best-effort - a missing device is fine.

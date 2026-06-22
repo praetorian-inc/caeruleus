@@ -70,7 +70,7 @@ pair / listen primitives into a single deterministic pass and emit structured
 findings (use -o json for the skill / report layer).
 
 Subcommands:
-  check-auth    what an unpaired attacker can read (and optionally write)
+  check-auth    what an unpaired attacker can read (read-only by default; --probe-write for writes)
   encryption    whether pairing changes what is exposed (enforcement / fallback)
   pairing       SMP feature-exchange + downgrade probe (raw, root, takes over adapter)
   wwr           write-without-response overflow + rapid-fire resilience

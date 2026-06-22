@@ -31,7 +31,8 @@ caeruleus write -b $A -a 0x0015 -s "hello"      # write a string (-n for hex)
 caeruleus listen -b $A -a 0x001e --duration 10s # capture notifications
 
 caeruleus recon -b $A                # device profile + GATT audit (fingerprint)
-caeruleus assess check-auth -b $A    # what an unpaired attacker can read
+caeruleus assess check-auth -b $A    # read-only: what an unpaired attacker can read
+caeruleus assess check-auth -b $A --probe-write  # also test unauthenticated writes
 caeruleus pair -b $A                 # pair/bond; caeruleus unpair -b $A to drop it
 caeruleus assess dfu -b $A           # detect a DFU service + unauthenticated entry
 
@@ -78,7 +79,7 @@ All emit `{address, test, summary, findings[]}`; findings carry `severity` (info
 | Command | What it tests |
 |---|---|
 | `recon -b A` | Fingerprint + audit: DFU presence, exposed serial, custom services, hidden-readable characteristics. |
-| `assess check-auth -b A [--probe-write]` | What an unpaired attacker can read; values are scanned with Titus and a secret match escalates to high. `--probe-write` also tests unauthenticated writes (same-value write-back). |
+| `assess check-auth -b A [--probe-write]` | **Read-only by default.** What an unpaired attacker can read; values are scanned with Titus and a secret match escalates to high. Add `--probe-write` to also test unauthenticated writes (same-value write-back; safe but exercises the write path). |
 | `assess encryption -b A` | Unauthenticated baseline, pair, re-test: no-pairing exposure, enforcement, legacy fallback after unpair. |
 | `assess dfu -b A [--probe-entry]` | Detect 0xFE59 DFU + unauthenticated buttonless entry. `--probe-entry` is **destructive** (reboots target). |
 | `assess wwr -b A [--sizes ...] [--burst N]` | Write-without-response overflow sweep + rapid-fire burst with a liveness probe (can crash a fragile target). |
@@ -114,7 +115,7 @@ A=AA:BB:CC:DD:EE:FF
 
 caeruleus doctor -o json                                   # 0. adapter sane?
 caeruleus recon             -b $A -o json > recon.json      # 1. profile + audit
-caeruleus assess check-auth -b $A -o json > checkauth.json  # 2. unauth read exposure
+caeruleus assess check-auth -b $A -o json > checkauth.json  # 2. unauth read exposure (read-only; add --probe-write for writes)
 caeruleus assess encryption -b $A -o json > enc.json        # 3. encryption enforcement
 caeruleus assess dfu        -b $A -o json > dfu.json        # 4. DFU exposure (detect-only)
 sudo caeruleus conn-params  -b $A -o json > conn.json       # 5. timing profile
