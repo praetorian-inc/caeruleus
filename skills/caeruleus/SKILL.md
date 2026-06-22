@@ -30,6 +30,11 @@ caeruleus read  -b $A -a 0x0013      # read a handle (or -u <uuid>)
 caeruleus write -b $A -a 0x0015 -s "hello"      # write a string (-n for hex)
 caeruleus listen -b $A -a 0x001e --duration 10s # capture notifications
 
+# subscribe, write a command, and capture the notification response (single command)
+# do NOT use separate write + listen — the notification fires within ms and you'll miss it
+caeruleus listen -b $A -a 0x0012 --trigger-value 01
+# use --trigger-handle if the write and notify characteristics differ; see listen --help for all flags
+
 caeruleus recon -b $A                # device profile + GATT audit (fingerprint)
 caeruleus assess check-auth -b $A    # what an unpaired attacker can read
 caeruleus pair -b $A                 # pair/bond; caeruleus unpair -b $A to drop it
