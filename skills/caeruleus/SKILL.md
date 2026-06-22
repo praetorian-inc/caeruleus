@@ -52,7 +52,7 @@ Add `-o json` to any command to get machine-readable output for scripting or rep
 ### Discovery
 | Command | Purpose |
 |---|---|
-| `scan [-t secs]` | LE discovery; `--new` hides cached devices. |
+| `scan [-t secs]` | LE discovery; shows address, type, RSSI, inferred device type (from GAP Appearance + service UUIDs), and name. `--new` hides cached devices. |
 | `enumerate -b A [--values] [--compact]` | Full GATT tree; `--values` reads each characteristic; `--compact` is one line/char. |
 | `primary -b A` / `characteristics -b A` | gatttool-style service / characteristic listing. |
 

@@ -15,6 +15,7 @@ import (
 // deviceProfile is the passive identity recovered from advertising + GATT.
 type deviceProfile struct {
 	Name           string        `json:"name,omitempty"`
+	DeviceType     string        `json:"device_type,omitempty"`
 	Manufacturer   string        `json:"manufacturer,omitempty"`
 	Model          string        `json:"model,omitempty"`
 	Serial         string        `json:"serial,omitempty"`
@@ -90,6 +91,11 @@ func runRecon(cmd *cobra.Command, args []string) error {
 	p := &res.Profile
 
 	// --- Device Information / GAP fingerprint ---
+	var appearance uint16
+	if raw, err := s.readSIG16Raw(0x2A01); err == nil && len(raw) >= 2 {
+		appearance = uint16(raw[0]) | uint16(raw[1])<<8
+	}
+
 	p.Name, _ = s.readSIG16(uuidGAPName)
 	p.Manufacturer, _ = s.readSIG16(uuidManufacturer)
 	p.Model, _ = s.readSIG16(uuidModel)
@@ -125,6 +131,13 @@ func runRecon(cmd *cobra.Command, args []string) error {
 			CharCount: charsBySvc[string(sv.Path)],
 		})
 	}
+
+	// --- Device type from Appearance + service UUIDs ---
+	var svcUUIDs []string
+	for _, sv := range svcs {
+		svcUUIDs = append(svcUUIDs, sv.UUID)
+	}
+	p.DeviceType = inferDeviceType(appearance, svcUUIDs)
 
 	// --- Audit findings ---
 	if p.DFUPresent {
@@ -204,6 +217,7 @@ func printReconText(res reconResult) {
 		}
 	}
 	line("name", p.Name)
+	line("device-type", p.DeviceType)
 	line("manufacturer", p.Manufacturer)
 	line("model", p.Model)
 	line("serial", p.Serial)

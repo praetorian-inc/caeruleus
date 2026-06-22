@@ -215,6 +215,17 @@ func (s *session) readSIG16(u16 uint16) (string, bool) {
 	return strings.TrimSpace(strings.Trim(asciiize(v), ". ")), true
 }
 
+// readSIG16Raw reads the first characteristic with the given adopted 16-bit
+// UUID and returns the raw bytes.
+func (s *session) readSIG16Raw(u16 uint16) ([]byte, error) {
+	full := fmt.Sprintf("0000%04x-0000-1000-8000-00805f9b34fb", u16)
+	chs := s.tree.ByUUID[full]
+	if len(chs) == 0 {
+		return nil, fmt.Errorf("characteristic 0x%04x not found", u16)
+	}
+	return s.conn.Characteristic(chs[0].Path).ReadValue(0)
+}
+
 // charByHandle resolves an ATT handle to a typed Characteristic within a
 // session's enumerated tree, or nil when the handle is unknown.
 func (s *session) charByHandle(h uint16) *bluez.Characteristic {
