@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"strconv"
 	"strings"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/praetorian-inc/caeruleus/internal/bdaddr"
 	"github.com/praetorian-inc/caeruleus/internal/bluez"
 )
 
@@ -97,13 +99,35 @@ func attemptPair(ctx context.Context, addr, capability string, passkey *uint32, 
 		}
 	}()
 
-	perr := dev.Pair()
+	// Some BlueZ versions complete the bond but leave the Pair() D-Bus
+	// call outstanding for tens of seconds. Run Pair() in a goroutine and
+	// poll Paired() so we detect success as soon as it actually happens.
+	type pairDone struct{ err error }
+	pairCh := make(chan pairDone, 1)
+	go func() { pairCh <- pairDone{dev.Pair()} }()
+
+	var perr error
+	poll := time.NewTicker(200 * time.Millisecond)
+	defer poll.Stop()
+waitPair:
+	for {
+		select {
+		case pd := <-pairCh:
+			perr = pd.err
+			break waitPair
+		case <-poll.C:
+			if p, _ := dev.Paired(); p {
+				break waitPair
+			}
+		case <-ctx.Done():
+			perr = ctx.Err()
+			break waitPair
+		}
+	}
+
 	pa := pairAttempt{}
 	pa.paired, _ = dev.Paired()
 	if !pa.paired {
-		// Only surface the error if we did NOT end up paired; some BlueZ
-		// versions complete the bond but leave Pair() outstanding (it returns
-		// a timeout), which is not a failure.
 		pa.pairErr = perr
 	}
 	if b, e := dev.Bonded(); e == nil {
@@ -161,6 +185,7 @@ var pairFlags struct {
 	passkey  string
 	rebond   bool
 	pairMode string
+	oob      string
 }
 
 func newPairCmd() *cobra.Command {
@@ -170,7 +195,7 @@ func newPairCmd() *cobra.Command {
 		Long: `Brings up the LE link to -b BDADDR, invokes Device1.Pair through an agent of
 the chosen IO capability, and reports the resulting Paired / Bonded state and
 the association model BlueZ negotiated (just-works / passkey-entry /
-numeric-comparison) plus whether it was MITM-protected.
+numeric-comparison / oob) plus whether it was MITM-protected.
 
 By default the agent is NoInputNoOutput, which forces Just Works (no MITM) -
 the common case for IoT peripherals. For a device that demands MITM, raise the
@@ -178,6 +203,20 @@ capability with --io and, for Passkey Entry, supply the passkey the peripheral
 displays (or that is printed/known) with --passkey:
 
   caeruleus pair -b A --io keyboard-display --passkey 123456
+
+OOB (Out-of-Band) pairing uses a secret obtained outside the BLE radio - e.g.
+by sniffing an NFC tap, decoding a QR code, or reading a printed label. This
+tool does not capture OOB data; you must obtain the secret yourself and supply
+it as hex:
+
+  # LE legacy OOB (128-bit TK, 32 hex digits):
+  caeruleus pair -b A --oob 0102030405060708090a0b0c0d0e0f10
+
+  # LE Secure Connections OOB (confirmation:random, 32:32 hex digits):
+  caeruleus pair -b A --oob aabbccdd...32hex:eeff0011...32hex
+
+OOB pairing requires sudo (MGMT socket access to provision the OOB data).
+Cannot be combined with --passkey.
 
 Pairing is an observation, not an assertion: a peripheral that rejects pairing
 is a finding, not a tool error (exits 0 with the rejection recorded). A device
@@ -189,6 +228,7 @@ A failure to reach the device at all is a hard error.`,
 	c.Flags().StringVar(&pairFlags.passkey, "passkey", "", "passkey for Passkey Entry: digits, or '-' to prompt interactively")
 	c.Flags().BoolVar(&pairFlags.rebond, "rebond", false, "drop any existing bond first, then pair fresh")
 	c.Flags().StringVar(&pairFlags.pairMode, "pair-mode", "auto", "pairing strategy: send-pairing|receive-pairing|auto")
+	c.Flags().StringVar(&pairFlags.oob, "oob", "", "OOB secret as hex: 32 chars (legacy TK) or confirm:random (SC, 32:32 chars)")
 	return c
 }
 
@@ -207,14 +247,57 @@ re-test, unpair, confirm it fell back to unencrypted).`,
 	}
 }
 
+// parseOOB decodes --oob into hash256 and rand256 for the mgmt API.
+// 32 hex chars → LE legacy TK (hash256=TK, rand256=zeros).
+// 32hex:32hex  → LE SC OOB (hash256=confirm, rand256=random).
+func parseOOB(raw string) (hash256, rand256 [16]byte, err error) {
+	raw = strings.TrimSpace(raw)
+	if parts := strings.SplitN(raw, ":", 2); len(parts) == 2 {
+		h, herr := hex.DecodeString(parts[0])
+		r, rerr := hex.DecodeString(parts[1])
+		if herr != nil || rerr != nil || len(h) != 16 || len(r) != 16 {
+			return hash256, rand256, fmt.Errorf("invalid --oob SC format: expected 32hex:32hex (confirm:random)")
+		}
+		copy(hash256[:], h)
+		copy(rand256[:], r)
+		return hash256, rand256, nil
+	}
+	tk, terr := hex.DecodeString(raw)
+	if terr != nil || len(tk) != 16 {
+		return hash256, rand256, fmt.Errorf("invalid --oob: expected 32 hex chars (legacy TK) or 32hex:32hex (SC confirm:random)")
+	}
+	copy(hash256[:], tk)
+	return hash256, rand256, nil
+}
+
+// mgmtAddrType maps --addr-type to the mgmt API addr_type byte.
+func mgmtAddrType(at string) uint8 {
+	if strings.EqualFold(at, "public") {
+		return 1
+	}
+	return 2 // LE random (default)
+}
+
 func runPair(cmd *cobra.Command, args []string) error {
 	addr, err := requireBdaddr()
 	if err != nil {
 		return err
 	}
-	capability, err := bluezIOCap(pairFlags.io)
+	// OOB provides MITM protection, but the kernel only sets the MITM
+	// flag in the SMP Pairing Request when the IO capability implies it.
+	// NoInputNoOutput (the default) → No MITM → peers that require MITM
+	// reject with "Authentication Requirements". Auto-promote to
+	// KeyboardDisplay when --oob is used so the AuthReq includes MITM.
+	ioFlag := pairFlags.io
+	if pairFlags.oob != "" && (ioFlag == "" || ioFlag == "none") {
+		ioFlag = "keyboard-display"
+	}
+	capability, err := bluezIOCap(ioFlag)
 	if err != nil {
 		return err
+	}
+	if pairFlags.oob != "" && pairFlags.passkey != "" {
+		return fmt.Errorf("--oob and --passkey cannot be combined (both supply authentication material)")
 	}
 	var passkey *uint32
 	var promptPasskey func() (uint32, error)
@@ -247,7 +330,8 @@ func runPair(cmd *cobra.Command, args []string) error {
 	ctx, cancel := ctxWithRootTimeout()
 	defer cancel()
 
-	// --rebond: drop any stored bond first so we pair fresh.
+	// --rebond: drop any stored bond first so we pair fresh. Must happen
+	// BEFORE OOB provisioning — RemoveDevice can clear kernel-side OOB data.
 	if pairFlags.rebond {
 		if c, e := bluez.Dial(root.adapter); e == nil {
 			_ = c.RemoveDevice(c.DevicePath(addr))
@@ -260,6 +344,46 @@ func runPair(cmd *cobra.Command, args []string) error {
 	case "send-pairing", "receive-pairing", "auto":
 	default:
 		return fmt.Errorf("invalid --pair-mode %q: use send-pairing|receive-pairing|auto", mode)
+	}
+
+	oobProvisioned := false
+	pairingSucceeded := false
+	if pairFlags.oob != "" {
+		if err := requireRoot("pair --oob"); err != nil {
+			return err
+		}
+		hash256, rand256, oerr := parseOOB(pairFlags.oob)
+		if oerr != nil {
+			return oerr
+		}
+		mac, merr := bdaddr.ParseMAC(addr)
+		if merr != nil {
+			return merr
+		}
+		idx, ierr := adapterIndex(root.adapter)
+		if ierr != nil {
+			return ierr
+		}
+		mgr, merr := bdaddr.OpenManager(idx)
+		if merr != nil {
+			return fmt.Errorf("open MGMT socket for OOB: %w", merr)
+		}
+		defer mgr.Close()
+		at := mgmtAddrType(root.addrType)
+		if err := mgr.AddRemoteOOBData(mac, at, hash256, rand256); err != nil {
+			return fmt.Errorf("provision OOB data: %w", err)
+		}
+		defer func() {
+			// The kernel consumes remote OOB data once a pairing procedure uses
+			// it, so after a successful bond there is nothing to remove and MGMT
+			// returns "not found" (INVALID_PARAMS). Only clear it when pairing did
+			// not complete, to drop a possibly-stale entry before a retry.
+			if !pairingSucceeded {
+				_ = mgr.RemoveRemoteOOBData(mac, at)
+			}
+		}()
+		oobProvisioned = true
+		statusf("OOB data provisioned via MGMT for %s", addr)
 	}
 
 	var pa pairAttempt
@@ -303,8 +427,16 @@ func runPair(cmd *cobra.Command, args []string) error {
 
 	res := pairResult{Address: addr, Action: "pair", Paired: pa.paired, Bonded: pa.bonded, PairMode: usedMode}
 	if pa.paired {
+		pairingSucceeded = true
 		res.Association = pa.model
 		res.MITM = pa.mitm
+		// When OOB data was provisioned and BlueZ drove the pairing without
+		// an explicit agent callback (model defaults to "just-works"), the
+		// actual association model was OOB.
+		if oobProvisioned && pa.model == "just-works" {
+			res.Association = "oob"
+			res.MITM = true
+		}
 	}
 	if pa.pairErr != nil {
 		res.Error = pa.pairErr.Error()
@@ -315,6 +447,8 @@ func runPair(cmd *cobra.Command, args []string) error {
 	}
 	if pa.pairErr != nil {
 		failf("pair %s rejected/unsupported: %v", addr, pa.pairErr)
+	} else if pa.paired && oobProvisioned {
+		statusf("pair %s ok via oob", addr)
 	} else if pa.paired && !pa.mitm {
 		statusf("pair %s ok via %s - no MITM protection", addr, pa.model)
 	} else {
@@ -326,7 +460,7 @@ func runPair(cmd *cobra.Command, args []string) error {
 	}
 	fmt.Printf(" pair_mode=%s", usedMode)
 	if pa.paired {
-		fmt.Printf(" association=%s mitm=%v", pa.model, pa.mitm)
+		fmt.Printf(" association=%s mitm=%v", res.Association, res.MITM)
 	}
 	if res.Error != "" {
 		fmt.Printf(" pair_error=%q", res.Error)

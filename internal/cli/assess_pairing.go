@@ -156,6 +156,27 @@ func runAssessPairing(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	// 5. OOB acceptance: does the peer respond differently when we claim to
+	// have OOB data? This reveals whether the device supports OOB pairing at
+	// the SMP level, useful context before trying `pair --oob`.
+	oobReq := smp.CapableRequest()
+	oobReq.OOB = 1
+	if r, e := probeOnce(dev, addr, addrType, oobReq, timeout); e == nil && r.Responded {
+		if r.Peer.OOB == 1 {
+			res.Findings = append(res.Findings, Finding{
+				Title:    "Peripheral claims OOB data available",
+				Severity: SevInfo,
+				Detail:   "When offered OOB=1 in Pairing Request, the peripheral also set OOB=1 in its response, indicating it has OOB data to exchange.",
+			})
+		} else {
+			res.Findings = append(res.Findings, Finding{
+				Title:    "Peripheral accepts OOB flag but has no OOB data",
+				Severity: SevInfo,
+				Detail:   "The peripheral responded to OOB=1 without setting OOB itself. Pairing would fall back to the IO-capability-based association model.",
+			})
+		}
+	}
+
 	return emitAssess(res)
 }
 
