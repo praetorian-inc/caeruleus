@@ -24,15 +24,16 @@ func (c *Conn) GetManagedObjects() (ManagedObjects, error) {
 
 // DeviceInfo summarises a discovered peripheral for scan output.
 type DeviceInfo struct {
-	Path      dbus.ObjectPath
-	Address   string
-	AddrType  string
-	Name      string
-	Alias     string
-	RSSI      int16
-	Connected bool
-	Paired    bool
-	UUIDs     []string
+	Path       dbus.ObjectPath
+	Address    string
+	AddrType   string
+	Name       string
+	Alias      string
+	RSSI       int16
+	Appearance uint16
+	Connected  bool
+	Paired     bool
+	UUIDs      []string
 }
 
 // Devices returns every Device1 known to BlueZ on this adapter.
@@ -77,6 +78,16 @@ func (c *Conn) Devices() ([]DeviceInfo, error) {
 		}
 		if v, ok := props["Paired"]; ok {
 			di.Paired, _ = v.Value().(bool)
+		}
+		if v, ok := props["Appearance"]; ok {
+			switch x := v.Value().(type) {
+			case uint16:
+				di.Appearance = x
+			case int16:
+				di.Appearance = uint16(x)
+			case uint32:
+				di.Appearance = uint16(x)
+			}
 		}
 		if v, ok := props["UUIDs"]; ok {
 			di.UUIDs, _ = v.Value().([]string)

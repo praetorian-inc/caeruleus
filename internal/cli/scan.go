@@ -171,7 +171,7 @@ loop:
 		return nil
 	}
 	t := newTable()
-	t.AppendHeader(table.Row{"ADDRESS", "TYPE", "RSSI", "NAME"})
+	t.AppendHeader(table.Row{"ADDRESS", "TYPE", "RSSI", "DEVICE", "NAME"})
 	for _, di := range list {
 		name := di.Name
 		if name == "" {
@@ -181,7 +181,8 @@ loop:
 		if di.RSSI != 0 {
 			rssi = fmt.Sprintf("%d", di.RSSI)
 		}
-		t.AppendRow(table.Row{di.Address, di.AddrType, rssi, name})
+		devType := inferDeviceType(di.Appearance, di.UUIDs)
+		t.AppendRow(table.Row{di.Address, di.AddrType, rssi, devType, name})
 	}
 	t.Render()
 	return nil
@@ -214,6 +215,21 @@ func updateDevice(di *bluez.DeviceInfo, props map[string]dbus.Variant) {
 			di.RSSI = int16(x)
 		}
 	}
+	if v, ok := props["Appearance"]; ok {
+		switch x := v.Value().(type) {
+		case uint16:
+			di.Appearance = x
+		case int16:
+			di.Appearance = uint16(x)
+		case uint32:
+			di.Appearance = uint16(x)
+		}
+	}
+	if v, ok := props["UUIDs"]; ok {
+		if uuids, ok := v.Value().([]string); ok {
+			di.UUIDs = uuids
+		}
+	}
 	if v, ok := props["Connected"]; ok {
 		di.Connected, _ = v.Value().(bool)
 	}
@@ -235,6 +251,9 @@ func merge(seen map[dbus.ObjectPath]bluez.DeviceInfo, di bluez.DeviceInfo) {
 		}
 		if di.RSSI == 0 {
 			di.RSSI = cur.RSSI
+		}
+		if di.Appearance == 0 {
+			di.Appearance = cur.Appearance
 		}
 	}
 	seen[di.Path] = di
