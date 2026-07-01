@@ -73,6 +73,18 @@ func attemptPair(ctx context.Context, addr, capability string, passkey *uint32) 
 		pa.bonded = &b
 	}
 	pa.model, pa.mitm = agent.Model()
+
+	// After a successful pair, prime BlueZ's GATT cache by triggering
+	// service discovery on this connection. ConnectLink (above) skipped
+	// GATT resolution for speed, but that leaves a Device1 with no cached
+	// attribute table — subsequent Connect calls may see 0 services because
+	// BlueZ reports ServicesResolved=true from the stale (empty) cache.
+	// Best-effort: if discovery doesn't finish before the context expires,
+	// the bond is still valid and the shell's connect recovery handles it.
+	if pa.paired {
+		_ = dev.WaitServicesResolved(ctx)
+	}
+
 	return pa, nil
 }
 

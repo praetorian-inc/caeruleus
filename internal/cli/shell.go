@@ -404,8 +404,27 @@ func (sh *shell) cmdConnect(ctx context.Context, args []string) {
 	}
 	timeout := time.Duration(root.timeout) * time.Second
 	t0 := time.Now()
-	if err := sh.s.device.Connect(ctx, timeout); err != nil {
-		fmt.Fprintln(sh.errOut(), "connect:", err)
+	connectErr := sh.s.device.Connect(ctx, timeout)
+
+	// A stale Device1 left by a prior link-only pair (or a poisoned
+	// security elevation) can make Connect hang on ServicesResolved or
+	// return an empty GATT tree. When the first Connect fails or yields
+	// 0 services, purge the Device1 and retry from scratch. RemoveDevice
+	// drops any stored bond, but a stuck Device1 is unusable anyway.
+	if connectErr != nil && isServicesResolvedTimeout(connectErr) {
+		logf("ServicesResolved timeout; purging stale Device1 for fresh discovery")
+		addr := sh.shellDeviceAddr()
+		_ = sh.s.device.Disconnect()
+		_ = sh.s.conn.RemoveDevice(sh.s.device.Path)
+		time.Sleep(300 * time.Millisecond)
+		sh.s.device = sh.s.conn.Device(addr)
+		if root.addrType != "" {
+			_ = sh.s.device.SetAddressType(root.addrType)
+		}
+		connectErr = sh.s.device.Connect(ctx, timeout)
+	}
+	if connectErr != nil {
+		fmt.Fprintln(sh.errOut(), "connect:", connectErr)
 		return
 	}
 	tree, err := sh.s.conn.EnumerateGatt(sh.s.device.Path)
@@ -413,6 +432,28 @@ func (sh *shell) cmdConnect(ctx context.Context, args []string) {
 		fmt.Fprintln(sh.errOut(), "enumerate:", err)
 		return
 	}
+
+	if len(tree.Services) == 0 {
+		logf("empty GATT cache after connect; purging Device1 for fresh discovery")
+		addr := sh.shellDeviceAddr()
+		_ = sh.s.device.Disconnect()
+		_ = sh.s.conn.RemoveDevice(sh.s.device.Path)
+		time.Sleep(300 * time.Millisecond)
+		sh.s.device = sh.s.conn.Device(addr)
+		if root.addrType != "" {
+			_ = sh.s.device.SetAddressType(root.addrType)
+		}
+		if err := sh.s.device.Connect(ctx, timeout); err != nil {
+			fmt.Fprintln(sh.errOut(), "connect (retry after purge):", err)
+			return
+		}
+		tree, err = sh.s.conn.EnumerateGatt(sh.s.device.Path)
+		if err != nil {
+			fmt.Fprintln(sh.errOut(), "enumerate (retry after purge):", err)
+			return
+		}
+	}
+
 	sh.sessMu.Lock()
 	sh.s.tree = tree
 	sh.sessMu.Unlock()
@@ -433,6 +474,88 @@ func (sh *shell) cmdDisconnect() {
 	sh.sessMu.Lock()
 	sh.s.tree = nil
 	sh.sessMu.Unlock()
+}
+
+// shellDeviceAddr extracts the BD_ADDR string from the current device's D-Bus
+// path. Used when we need to re-create the Device object after RemoveDevice.
+func (sh *shell) shellDeviceAddr() string {
+	if sh.s.device != nil {
+		if a, _ := sh.s.device.Address(); a != "" {
+			return a
+		}
+	}
+	// Fall back to parsing the D-Bus object path.
+	p := ""
+	if sh.s.device != nil {
+		p = string(sh.s.device.Path)
+	}
+	p = strings.TrimPrefix(p, "/org/bluez/"+root.adapter+"/dev_")
+	return strings.ReplaceAll(p, "_", ":")
+}
+
+// isServicesResolvedTimeout returns true when a Connect error is specifically
+// a ServicesResolved timeout — the ACL link came up but GATT discovery never
+// completed, typically because a stale Device1 object confused BlueZ.
+func isServicesResolvedTimeout(err error) bool {
+	if err == nil {
+		return false
+	}
+	return strings.Contains(err.Error(), "waiting for ServicesResolved")
+}
+
+// isLinkPoisoned returns true when a read/write error looks like a failed
+// security elevation that left the link unusable for subsequent GATT
+// operations. This mirrors the classification in readBaseline
+// (assess_encryption.go) — a timeout or "in progress" error after a read
+// on an auth-gated characteristic means BlueZ tried and failed to elevate
+// the link, and the connection is now stuck.
+func isLinkPoisoned(err error) bool {
+	if err == nil {
+		return false
+	}
+	s := strings.ToLower(err.Error())
+	return strings.Contains(s, "context deadline exceeded") ||
+		strings.Contains(s, "operation already in progress") ||
+		strings.Contains(s, "in progress")
+}
+
+// reconnect tears down the current link and establishes a fresh one. It
+// first tries a simple disconnect+reconnect (preserving any bond); if that
+// yields an empty GATT tree, it falls back to RemoveDevice (which drops the
+// bond but clears the stale cache). Returns true on success.
+func (sh *shell) reconnect(ctx context.Context) bool {
+	addr := sh.shellDeviceAddr()
+	_ = sh.s.device.Disconnect()
+	time.Sleep(500 * time.Millisecond)
+	timeout := time.Duration(root.timeout) * time.Second
+	if err := sh.s.device.Connect(ctx, timeout); err != nil {
+		// Simple reconnect failed; purge and retry.
+		_ = sh.s.conn.RemoveDevice(sh.s.device.Path)
+		time.Sleep(300 * time.Millisecond)
+		sh.s.device = sh.s.conn.Device(addr)
+		if root.addrType != "" {
+			_ = sh.s.device.SetAddressType(root.addrType)
+		}
+		if err := sh.s.device.Connect(ctx, timeout); err != nil {
+			fmt.Fprintln(sh.errOut(), "reconnect:", err)
+			sh.sessMu.Lock()
+			sh.s.tree = nil
+			sh.sessMu.Unlock()
+			return false
+		}
+	}
+	tree, err := sh.s.conn.EnumerateGatt(sh.s.device.Path)
+	if err != nil {
+		fmt.Fprintln(sh.errOut(), "reconnect enumerate:", err)
+		sh.sessMu.Lock()
+		sh.s.tree = nil
+		sh.sessMu.Unlock()
+		return false
+	}
+	sh.sessMu.Lock()
+	sh.s.tree = tree
+	sh.sessMu.Unlock()
+	return true
 }
 
 func (sh *shell) cmdPrimary() {
@@ -525,6 +648,13 @@ func (sh *shell) cmdRead(args []string) {
 	}
 	if err != nil {
 		fmt.Fprintln(sh.errOut(), "read:", err)
+		// A failed security elevation (timeout / in-progress) poisons the
+		// link for all subsequent reads. Reconnect automatically so the
+		// user doesn't have to manually disconnect/forget/connect.
+		if isLinkPoisoned(err) {
+			fmt.Fprintln(sh.errOut(), "link poisoned by failed security elevation; reconnecting...")
+			sh.reconnect(context.Background())
+		}
 		return
 	}
 	fmt.Fprintln(sh.stdOut(), formatReadLine(obj.Handle, v))
