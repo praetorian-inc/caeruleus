@@ -23,12 +23,26 @@ type pairAttempt struct {
 	mitm    bool   // MITM-protected association
 }
 
+// isSMPRejection returns true when err indicates the peripheral did not enter
+// its pairing state machine — as opposed to pairing that completed but was
+// rejected for another reason (e.g. wrong passkey). These are the cases where
+// retrying with receive-pairing (full GATT connect) may succeed.
+func isSMPRejection(err error) bool {
+	if err == nil {
+		return false
+	}
+	s := err.Error()
+	return containsAny(s, "Authentication Canceled", "Authentication Failed")
+}
+
 // attemptPair brings up the link to addr, invokes Device1.Pair with an agent
 // of the given IO capability (and optional passkey), records the resulting
 // Paired/Bonded state and the negotiated association model, then disconnects
-// (the bond persists). The returned error is non-nil only when the device
-// could not be reached.
-func attemptPair(ctx context.Context, addr, capability string, passkey *uint32) (pairAttempt, error) {
+// (the bond persists). pairMode selects the connect strategy: "send-pairing"
+// uses ConnectLink (bare ACL), "receive-pairing" uses Connect (full GATT
+// discovery). The returned error is non-nil only when the device could not be
+// reached.
+func attemptPair(ctx context.Context, addr, capability string, passkey *uint32, pairMode string, promptPasskey func() (uint32, error)) (pairAttempt, error) {
 	conn, err := bluez.Dial(root.adapter)
 	if err != nil {
 		return pairAttempt{}, err
@@ -38,7 +52,7 @@ func attemptPair(ctx context.Context, addr, capability string, passkey *uint32) 
 	// BlueZ needs a registered agent to complete pairing (even Just Works).
 	// Its capability decides which association models are possible; surface any
 	// display/confirm prompts to the operator. Register for this pairing only.
-	agent := &bluez.PairingAgent{Passkey: passkey, Logf: func(f string, v ...interface{}) { statusf(f, v...) }}
+	agent := &bluez.PairingAgent{Passkey: passkey, PromptPasskey: promptPasskey, Logf: func(f string, v ...interface{}) { statusf(f, v...) }}
 	if cleanup, e := conn.RegisterPairingAgent(capability, agent); e == nil {
 		defer cleanup()
 	} else {
@@ -49,11 +63,34 @@ func attemptPair(ctx context.Context, addr, capability string, passkey *uint32) 
 	if root.addrType != "" {
 		_ = dev.SetAddressType(root.addrType)
 	}
-	// Pairing needs only the ACL link, not full GATT discovery (which is slow
-	// on lax-conn-param peripherals), so connect link-only.
-	if err := dev.ConnectLink(ctx, time.Duration(root.timeout)*time.Second); err != nil {
-		return pairAttempt{}, fmt.Errorf("connect before pair: %w", err)
+	switch pairMode {
+	case "receive-pairing":
+		// ConnectLink calls D-Bus Device1.Connect (which starts GATT
+		// discovery in BlueZ) but only waits for Connected=true, not
+		// ServicesResolved. During GATT discovery BlueZ reads attributes;
+		// when it hits one that returns Insufficient Authentication, the
+		// registered agent handles the SMP exchange reactively. We then
+		// poll for Paired=true rather than blocking on ServicesResolved
+		// (which stalls while the SMP exchange is in-flight).
+		if err := dev.ConnectLink(ctx, time.Duration(root.timeout)*time.Second); err != nil {
+			return pairAttempt{}, fmt.Errorf("connect before pair: %w", err)
+		}
+		if paired, _ := dev.WaitPaired(ctx, time.Duration(root.timeout)*time.Second); paired {
+			pa := pairAttempt{paired: true}
+			if b, e := dev.Bonded(); e == nil {
+				pa.bonded = &b
+			}
+			pa.model, pa.mitm = agent.Model()
+			return pa, nil
+		}
+		// Paired never flipped — fall through to explicit Pair() below in
+		// case GATT discovery didn't hit a protected characteristic.
+	default: // send-pairing
+		if err := dev.ConnectLink(ctx, time.Duration(root.timeout)*time.Second); err != nil {
+			return pairAttempt{}, fmt.Errorf("connect before pair: %w", err)
+		}
 	}
+
 	defer func() {
 		if c, e := dev.Connected(); e == nil && c {
 			_ = dev.Disconnect()
@@ -109,19 +146,21 @@ func bluezIOCap(io string) (string, error) {
 // pairResult is the structured output of `pair` / `unpair`.
 type pairResult struct {
 	Address     string `json:"address"`
-	Action      string `json:"action"` // "pair" | "unpair"
+	Action      string `json:"action"`                // "pair" | "unpair"
 	Paired      bool   `json:"paired"`
 	Bonded      *bool  `json:"bonded,omitempty"`      // nil when BlueZ doesn't expose Bonded
-	Association string `json:"association,omitempty"` // just-works | passkey-entry | numeric-comparison
+	PairMode    string `json:"pair_mode,omitempty"`    // send-pairing | receive-pairing
+	Association string `json:"association,omitempty"`  // just-works | passkey-entry | numeric-comparison
 	MITM        bool   `json:"mitm,omitempty"`
 	Removed     bool   `json:"removed,omitempty"`
-	Error       string `json:"error,omitempty"` // peer-side rejection, not a tool failure
+	Error       string `json:"error,omitempty"`        // peer-side rejection, not a tool failure
 }
 
 var pairFlags struct {
-	io      string
-	passkey string
-	rebond  bool
+	io       string
+	passkey  string
+	rebond   bool
+	pairMode string
 }
 
 func newPairCmd() *cobra.Command {
@@ -147,8 +186,9 @@ A failure to reach the device at all is a hard error.`,
 		RunE: runPair,
 	}
 	c.Flags().StringVar(&pairFlags.io, "io", "none", "IO capability: none|display-only|keyboard-only|display-yesno|keyboard-display")
-	c.Flags().StringVar(&pairFlags.passkey, "passkey", "", "passkey for Passkey Entry pairing (digits the peripheral displays)")
+	c.Flags().StringVar(&pairFlags.passkey, "passkey", "", "passkey for Passkey Entry: digits, or '-' to prompt interactively")
 	c.Flags().BoolVar(&pairFlags.rebond, "rebond", false, "drop any existing bond first, then pair fresh")
+	c.Flags().StringVar(&pairFlags.pairMode, "pair-mode", "auto", "pairing strategy: send-pairing|receive-pairing|auto")
 	return c
 }
 
@@ -177,7 +217,25 @@ func runPair(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	var passkey *uint32
-	if pairFlags.passkey != "" {
+	var promptPasskey func() (uint32, error)
+	switch strings.TrimSpace(pairFlags.passkey) {
+	case "":
+		// no passkey
+	case "-":
+		// Interactive: prompt the operator when the peripheral requests input.
+		promptPasskey = func() (uint32, error) {
+			fmt.Print("[?] enter passkey shown on device: ")
+			var s string
+			if _, err := fmt.Scanln(&s); err != nil {
+				return 0, err
+			}
+			n, err := strconv.ParseUint(strings.TrimSpace(s), 10, 32)
+			if err != nil || n > 999999 {
+				return 0, fmt.Errorf("invalid passkey %q", s)
+			}
+			return uint32(n), nil
+		}
+	default:
 		n, perr := strconv.ParseUint(strings.TrimSpace(pairFlags.passkey), 10, 32)
 		if perr != nil || n > 999999 {
 			return fmt.Errorf("invalid --passkey %q: expected up to 6 digits", pairFlags.passkey)
@@ -197,12 +255,53 @@ func runPair(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	pa, err := attemptPair(ctx, addr, capability, passkey)
-	if err != nil {
-		return err // could not reach the device - a real error
+	mode := pairFlags.pairMode
+	switch mode {
+	case "send-pairing", "receive-pairing", "auto":
+	default:
+		return fmt.Errorf("invalid --pair-mode %q: use send-pairing|receive-pairing|auto", mode)
 	}
 
-	res := pairResult{Address: addr, Action: "pair", Paired: pa.paired, Bonded: pa.bonded}
+	var pa pairAttempt
+	usedMode := mode
+
+	switch mode {
+	case "send-pairing", "receive-pairing":
+		pa, err = attemptPair(ctx, addr, capability, passkey, mode, promptPasskey)
+		if err != nil {
+			return err
+		}
+	case "auto":
+		if promptPasskey != nil {
+			// Interactive passkey requires the reactive flow — the
+			// send-pairing probe would trigger the device's pairing state
+			// machine (via GATT) and then reject it (no prompt), poisoning
+			// the device state for the real attempt.
+			usedMode = "receive-pairing"
+			pa, err = attemptPair(ctx, addr, capability, passkey, "receive-pairing", promptPasskey)
+			if err != nil {
+				return err
+			}
+		} else {
+			usedMode = "send-pairing"
+			pa, err = attemptPair(ctx, addr, capability, passkey, "send-pairing", nil)
+			if err != nil {
+				return err
+			}
+			if pa.pairErr != nil && isSMPRejection(pa.pairErr) {
+				logf("send-pairing failed (%v), retrying with receive-pairing", pa.pairErr)
+				usedMode = "receive-pairing"
+				ctx2, cancel2 := ctxWithRootTimeout()
+				defer cancel2()
+				pa, err = attemptPair(ctx2, addr, capability, passkey, "receive-pairing", nil)
+				if err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	res := pairResult{Address: addr, Action: "pair", Paired: pa.paired, Bonded: pa.bonded, PairMode: usedMode}
 	if pa.paired {
 		res.Association = pa.model
 		res.MITM = pa.mitm
@@ -225,6 +324,7 @@ func runPair(cmd *cobra.Command, args []string) error {
 	if res.Bonded != nil {
 		fmt.Printf(" bonded=%v", *res.Bonded)
 	}
+	fmt.Printf(" pair_mode=%s", usedMode)
 	if pa.paired {
 		fmt.Printf(" association=%s mitm=%v", pa.model, pa.mitm)
 	}
