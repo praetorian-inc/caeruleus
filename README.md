@@ -1,3 +1,5 @@
+<img width="1200" height="628" alt="praetorian-blog-hero-1200x628" src="https://github.com/user-attachments/assets/bd67cbb9-64db-4fa6-9f63-5ea5f3a1610b" />
+
 # CaeruLEus
 
 Caeruleus is a single Go binary (`caeruleus`) for the whole Bluetooth Low Energy assessment workflow on Linux/BlueZ: scan, enumerate, read/write/notify, fuzz, and structured security assessment. It talks to peripherals over BlueZ D-Bus and raw L2CAP/HCI sockets, and every command supports `-o json` for scripting, reporting, and LLM agents.
