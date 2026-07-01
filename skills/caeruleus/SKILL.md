@@ -25,6 +25,7 @@ A few commands need **root** (raw HCI/L2CAP or system config): `conn-params`, `m
 A=AA:BB:CC:DD:EE:FF                 # target (from: caeruleus scan)
 
 caeruleus scan                       # discover devices (names, addr type, RSSI)
+caeruleus scan --live                # live updating table, indexed rows (Ctrl-C to stop)
 caeruleus enumerate -b $A --values   # full GATT tree + read each value
 caeruleus read  -b $A -a 0x0013      # read a handle (or -u <uuid>)
 caeruleus write -b $A -a 0x0015 -s "hello"      # write a string (-n for hex)
@@ -52,7 +53,7 @@ Add `-o json` to any command to get machine-readable output for scripting or rep
 ### Discovery
 | Command | Purpose |
 |---|---|
-| `scan [-t secs]` | LE discovery; shows address, type, RSSI, inferred device type (from GAP Appearance + service UUIDs), and name. `--new` hides cached devices. |
+| `scan [-d secs]` | LE discovery; shows address, type, RSSI, inferred device type (from GAP Appearance + service UUIDs), and name. `--new` hides cached devices. `--live` shows a self-updating table as devices appear (RSSI/last-seen refresh in place; runs until Ctrl-C unless `-d` given), each row carrying a 1-based index. `-o jsonl` streams found/update events. |
 | `enumerate -b A [--values] [--compact]` | Full GATT tree; `--values` reads each characteristic; `--compact` is one line/char. |
 | `primary -b A` / `characteristics -b A` | gatttool-style service / characteristic listing. |
 
@@ -77,6 +78,8 @@ Add `-o json` to any command to get machine-readable output for scripting or rep
 | Command | Purpose |
 |---|---|
 | `shell -b A` / `batch -b A` / `serve`+`send` | Interactive REPL / stdin script / persistent warm-link daemon. |
+
+Inside `shell`, `scan [SECONDS]` runs the same live updating table (bare `scan` scans until you press Enter; `scan 8` for a fixed window). Each result is numbered, and `connect <#>` connects by that index (e.g. `connect 3`) instead of typing the address. `-b` is optional when starting the shell - scan, then connect by index.
 
 ### Security assessment (structured findings)
 All emit `{address, test, summary, findings[]}`; findings carry `severity` (info/low/medium/high/critical), `handle`, `uuid`, `evidence`, `detail`. **They exit 0 even when issues are found** - findings are data.
