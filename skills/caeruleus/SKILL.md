@@ -1,6 +1,6 @@
 ---
 name: caeruleus
-description: Use when performing hardware-agnostic BLE security testing on Linux/BlueZ - device scanning, GATT enumeration, read/write/notify interaction, fuzzing, and security assessment (unauthenticated read/write exposure, encryption enforcement, DFU entry, write-without-response abuse, connection parameters). Drives the single Go `caeruleus` binary; no separate server process, no external tool wrapping.
+description: Use when performing BLE security testing on Linux/BlueZ - device scanning, GATT enumeration, read/write/notify interaction, fuzzing, and security assessment (unauthenticated read/write exposure, encryption enforcement, DFU entry, write-without-response abuse, connection parameters). Drives the single Go `caeruleus` binary; no separate server process, no external tool wrapping.
 compatibility: Linux with BlueZ (bluetoothd) and a standard BLE adapter. Ships as a single self-contained `caeruleus` binary; some commands need root (raw HCI/L2CAP). Harness-agnostic - usable from any Agent Skills-compatible agent.
 allowed-tools: Bash Read
 ---
@@ -9,7 +9,7 @@ allowed-tools: Bash Read
 
 **`caeruleus` is a single Go binary that talks to BLE peripherals over BlueZ D-Bus and raw L2CAP/HCI sockets.** Every subcommand takes `-b <BDADDR>` and supports `-o json`. This skill drives that binary: pick the command for the task, and for an assessment, chain the `recon` / `assess` / `conn-params` commands and correlate their JSON findings into a report.
 
-It is hardware-agnostic and self-contained - just a BLE adapter and BlueZ. No Python, no separate server, no sniffer/relay hardware, and it never shells out to other tools. (Off-path sniffing of other devices and MITM/peripheral-clone work are out of scope - use dedicated hardware for those.)
+It is self-contained - just a BLE adapter and BlueZ. No Python, no separate server, and it never shells out to other tools. (Off-path sniffing of other devices and MITM/peripheral-clone work are out of scope - use dedicated hardware for those.)
 
 ## Setup
 
@@ -18,6 +18,14 @@ Use the provided `caeruleus` release binary: put it on `PATH` (e.g. `sudo instal
 A few commands need **root** (raw HCI/L2CAP or system config): `conn-params`, `monitor`, `fuzz write --raw`, `cccd --raw`, `raw-write`, `mtu --set/--reset`, `bdaddr --set`. Run those with `sudo caeruleus …`; for unattended use, a scoped sudoers drop-in (`"$USER ALL=(root) NOPASSWD: $(command -v caeruleus)"` in `/etc/sudoers.d/caeruleus`) avoids prompts.
 
 > Building from source is only needed if you weren't given a binary: `make build` at the repo root produces `./caeruleus`.
+
+## Discovering commands
+
+Prefer the tool's own help over guessing at flags:
+
+- `caeruleus --help` - the full command map, grouped (Discovery, GATT operations, Connection management, Scripting & automation, Security assessment, Fuzzing, Adapter & diagnostics).
+- `caeruleus <command> --help` - a command's complete, current flags. The reference tables below are a curated summary; `--help` is authoritative.
+- `caeruleus recipes [keyword]` - use-case-first examples ("write to one handle, capture a notification on another"). Bare `recipes` lists all; add a keyword to filter (e.g. `recipes trigger`, `recipes llm`).
 
 ## Common tasks
 
@@ -44,6 +52,7 @@ caeruleus assess dfu -b $A           # detect a DFU service + unauthenticated en
 
 caeruleus shell -b $A                # interactive REPL against one device
 caeruleus doctor                     # adapter / bluetoothd health check
+caeruleus recipes                    # use-case-first command examples (add a keyword to filter)
 ```
 
 Add `-o json` to any command to get machine-readable output for scripting or reporting. **When you use `-o json` or `-o jsonl`, treat that output as authoritative. Do NOT re-run the same command in text mode "for display" — the JSON contains all the same data and re-running wastes tokens and time. Parse the JSON directly.**

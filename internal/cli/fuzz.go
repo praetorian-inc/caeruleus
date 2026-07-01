@@ -16,9 +16,7 @@ inputs that produced new states or crash signals to an on-disk corpus.
 Subcommands:
 
   fuzz write    drive writes against a single characteristic
-  fuzz replay   re-send saved inputs from a previous run
-
-See docs/fuzzing-plan.md for the design.`,
+  fuzz replay   re-send saved inputs from a previous run`,
 	}
 	c.AddCommand(newFuzzWriteCmd())
 	c.AddCommand(newFuzzReplayCmd())
