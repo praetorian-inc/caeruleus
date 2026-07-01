@@ -115,6 +115,7 @@ mtu --set/--reset) require root.`
 	add("diag",
 		newDoctorCmd(), newAdapterCmd(), newBdaddrCmd(), newMonitorCmd(),
 	)
+	cmd.AddCommand(newRecipesCmd())     // ungrouped (Additional Commands)
 	cmd.AddCommand(newCompletionCmd()) // ungrouped (Additional Commands)
 	return cmd
 }
