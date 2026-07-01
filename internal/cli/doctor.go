@@ -12,8 +12,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"caeruleus/internal/bdaddr"
-	"caeruleus/internal/bluez"
+	"github.com/praetorian-inc/caeruleus/internal/bdaddr"
+	"github.com/praetorian-inc/caeruleus/internal/bluez"
 )
 
 func newDoctorCmd() *cobra.Command {

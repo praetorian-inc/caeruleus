@@ -7,7 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"caeruleus/internal/bluez"
+	"github.com/praetorian-inc/caeruleus/internal/bluez"
 )
 
 func newDisconnectCmd() *cobra.Command {

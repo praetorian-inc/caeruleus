@@ -11,7 +11,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"caeruleus/internal/hcimon"
+	"github.com/praetorian-inc/caeruleus/internal/hcimon"
 )
 
 var monitorFlags struct {

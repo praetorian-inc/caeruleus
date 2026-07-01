@@ -8,10 +8,10 @@ import (
 	"testing"
 	"time"
 
-	"caeruleus/internal/fuzz/corpus"
-	"caeruleus/internal/fuzz/mutate"
-	"caeruleus/internal/fuzz/oracle"
-	"caeruleus/internal/fuzz/trace"
+	"github.com/praetorian-inc/caeruleus/internal/fuzz/corpus"
+	"github.com/praetorian-inc/caeruleus/internal/fuzz/mutate"
+	"github.com/praetorian-inc/caeruleus/internal/fuzz/oracle"
+	"github.com/praetorian-inc/caeruleus/internal/fuzz/trace"
 )
 
 // fakeHarness lets us drive engine.Run with deterministic responses for

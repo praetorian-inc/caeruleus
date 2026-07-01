@@ -8,8 +8,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"caeruleus/internal/bluez"
-	"caeruleus/internal/hcimon"
+	"github.com/praetorian-inc/caeruleus/internal/bluez"
+	"github.com/praetorian-inc/caeruleus/internal/hcimon"
 )
 
 // connParamsWindow is how long we keep listening for a Connection Update

@@ -44,6 +44,14 @@ make build        # -> ./caeruleus
 make test         # unit tests + shell tests
 ```
 
+Or install the binary onto your `$PATH` directly with the Go toolchain:
+
+```bash
+go install github.com/praetorian-inc/caeruleus/cmd/caeruleus@latest
+```
+
+> Note: caeruleus targets Linux/BlueZ and does not build on macOS or Windows.
+
 ## Command groups
 
 | Group | Commands |

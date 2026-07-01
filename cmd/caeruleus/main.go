@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"caeruleus/internal/cli"
+	"github.com/praetorian-inc/caeruleus/internal/cli"
 )
 
 func main() {

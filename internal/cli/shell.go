@@ -17,7 +17,7 @@ import (
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 
-	"caeruleus/internal/bluez"
+	"github.com/praetorian-inc/caeruleus/internal/bluez"
 )
 
 func newShellCmd() *cobra.Command {
