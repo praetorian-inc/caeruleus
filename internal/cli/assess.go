@@ -2,7 +2,6 @@ package cli
 
 import (
 	"fmt"
-	"os"
 	"regexp"
 	"sort"
 	"strings"
@@ -275,8 +274,7 @@ func emitAssess(res assessResult) error {
 		fmt.Println("no findings")
 		return nil
 	}
-	t := table.NewWriter()
-	t.SetOutputMirror(os.Stdout)
+	t := newTable()
 	t.AppendHeader(table.Row{"SEV", "HANDLE", "UUID", "FINDING", "EVIDENCE"})
 
 	// On a terminal, bound the wrappable columns so the box fits the width.

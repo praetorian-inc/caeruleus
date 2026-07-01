@@ -3,7 +3,6 @@ package cli
 import (
 	"encoding/binary"
 	"fmt"
-	"os"
 	"sort"
 	"strings"
 
@@ -214,8 +213,7 @@ func printReconText(res reconResult) {
 	line("pref-conn", p.PreferredConn)
 	fmt.Printf("  services:      %d (%d custom) dfu=%v\n", len(p.Services), p.CustomServices, p.DFUPresent)
 
-	t := table.NewWriter()
-	t.SetOutputMirror(os.Stdout)
+	t := newTable()
 	t.AppendHeader(table.Row{"SVC HND", "UUID", "KIND", "CHARS"})
 	for _, sv := range p.Services {
 		kind := "adopted"
