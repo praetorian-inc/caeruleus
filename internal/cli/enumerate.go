@@ -65,7 +65,7 @@ func runEnumerate(cmd *cobra.Command, args []string) error {
 	}
 	defer s.close()
 
-	rows := buildEnumRows(s)
+	rows := buildEnumRows(s, enumerateFlags.readValues)
 	if formatIsJSON() {
 		return emitJSON(rows)
 	}
@@ -163,7 +163,7 @@ func runEnumerate(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func buildEnumRows(s *session) []enumRow {
+func buildEnumRows(s *session, readValues bool) []enumRow {
 	// Build service-by-path map so we can locate the owning service of a char.
 	svcs := map[string]bluez.GattObject{}
 	for _, sv := range s.tree.Services {
@@ -190,7 +190,7 @@ func buildEnumRows(s *session) []enumRow {
 			CharUUID:      ch.UUID,
 			Properties:    formatProps(ch.Flags),
 		}
-		if enumerateFlags.readValues && propsCan(ch.Flags, "read") {
+		if readValues && propsCan(ch.Flags, "read") {
 			c := s.conn.Characteristic(ch.Path)
 			if v, err := c.ReadValue(0); err == nil {
 				row.ValueHex = hex.EncodeToString(v)
