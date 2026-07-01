@@ -59,6 +59,8 @@ Add `-o json` to any command to get machine-readable output for scripting or rep
 
 ## Command reference
 
+**Handles.** Every handle argument (`-a`, `listen -a`, and the shell/batch `char-read-hnd` / `char-write-*` verbs) is an ATT **value handle**. `enumerate`'s `char_handle` is already the value handle, so pass it straight to `-a`. `characteristics` prints both the declaration `handle` and the `value_handle` (they differ, usually by one); use the `value_handle`.
+
 ### Discovery
 | Command | Purpose |
 |---|---|
@@ -89,6 +91,8 @@ Add `-o json` to any command to get machine-readable output for scripting or rep
 | `shell -b A` / `batch -b A` / `serve`+`send` | Interactive REPL / stdin script / persistent warm-link daemon. |
 
 Inside `shell`, `scan [SECONDS]` runs the same live updating table (bare `scan` scans until you press Enter; `scan 8` for a fixed window). Each result is numbered, and `connect <#>` connects by that index (e.g. `connect 3`) instead of typing the address. `-b` is optional when starting the shell - scan, then connect by index.
+
+Shell/batch verbs are positional and do **not** accept the top-level `-s`/`-n`/`--req` flags. Write hex with `char-write-req 0xHND HEX` (or `char-write-cmd` for no-response); write an ASCII string with `write-string-req 0xHND "STR"` (or `write-string`); read with `char-read-hnd 0xHND`. Run `help` inside `shell` for the full verb list.
 
 ### Security assessment (structured findings)
 All emit `{address, test, summary, findings[]}`; findings carry `severity` (info/low/medium/high/critical), `handle`, `uuid`, `evidence`, `detail`. **They exit 0 even when issues are found** - findings are data.
@@ -173,3 +177,5 @@ Then **correlate**: merge all `findings[]`, dedupe by `(uuid, title)`, rank by s
 - **Single-connection peripherals:** many small devices accept one central at a time. The tool disconnects on exit; for many sequential operations use `serve` + `send` to hold one warm link.
 - **Pairing rejection is a result,** not a failure: `pair` / `assess encryption` exit 0 and record it.
 - **`assess wwr` and `assess dfu --probe-entry` are active/destructive** - only run against targets you can recover (they may reset the device).
+- **MTU changes are global and gated.** `mtu --set`/`--reset` edit `/etc/bluetooth/main.conf` and restart `bluetoothd`, which affects every adapter on the host, and they prompt on a TTY (pass `-y` for scripts). An MTU mismatch can *block* a connection (e.g. `Connect: Input/output error`), not just truncate reads - `mtu --set 247` is a reasonable first try when a connect fails that way.
+- **`bdaddr --set` is per-controller.** The vendor HCI write succeeds on some chips and silently no-ops or reverts on others (varies by CSR / Intel / Broadcom part). With more than one adapter, use `-i hciN` to target the one that accepts it; the default `hci0` may not be spoofable.
