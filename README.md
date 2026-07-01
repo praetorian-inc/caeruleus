@@ -21,7 +21,7 @@ caeruleus/
 │   ├── bdaddr/           # adapter BD_ADDR read/spoof (vendor HCI)
 │   └── fuzz/             # fuzzing: mutation engine, corpus, crash/hang triage
 ├── skills/caeruleus/     # the Go-driven Agent Skill (portable; agentskills.io format)
-└── docs/                 # fuzzing-plan.md, ux-improvements.md
+└── docs/                 # quick-reference.md
 ```
 
 ## Build
