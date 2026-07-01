@@ -38,7 +38,7 @@ Example:
 
   ./caeruleus batch -b $ADDR <<'EOF'
   read 0x0015
-  write 0x002b -s "BLE{FOO}" --req
+  write-string-req 0x002b "BLE{FOO}"
   read 0x0029
   EOF`,
 		RunE: runBatch,
