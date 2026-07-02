@@ -20,17 +20,17 @@ import (
 )
 
 var scanFlags struct {
-	duration   int
-	onlyNew    bool
-	name       string
-	prefix     string
-	keepFilter bool
-	live       bool
+	duration     int
+	includeCached bool
+	name         string
+	prefix       string
+	keepFilter   bool
+	live         bool
 }
 
 // scanEvent is one streamed observation emitted under --live. "found" is the
-// first time a device is seen this window (including BlueZ's cached snapshot);
-// "update" is a subsequent RSSI/name/type change on a device already reported.
+// first time a device is seen this window; "update" is a subsequent
+// RSSI/name/type change on a device already reported.
 type scanEvent struct {
 	Event    string `json:"event"`
 	Index    int    `json:"index"` // 1-based, stable in first-seen order (matches the table column)
@@ -44,10 +44,10 @@ func newScanCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "scan",
 		Short: "Scan for nearby BLE devices",
-		Long: `scan starts LE device discovery and lists every device BlueZ knows about
-after the scan window - both freshly-advertised devices (InterfacesAdded
-events) and devices BlueZ had cached from before. Pass --new to suppress
-the cached set if you only want devices that advertised in this window.
+		Long: `scan starts LE device discovery and lists devices that actively advertised
+during the scan window. Devices that BlueZ has cached from previous sessions
+but that did not advertise are excluded by default; pass --include-cached to
+show them as well.
 
 Pass --live to watch devices arrive in real time instead of printing a single
 table at the end. On a terminal this shows one self-updating table: a new
@@ -63,7 +63,7 @@ returning so subsequent scans by other clients aren't constrained.`,
 		RunE: runScan,
 	}
 	c.Flags().IntVarP(&scanFlags.duration, "duration", "d", 8, "scan duration in seconds")
-	c.Flags().BoolVar(&scanFlags.onlyNew, "new", false, "show only devices freshly advertising during this scan; exclude BlueZ's pre-existing snapshot")
+	c.Flags().BoolVar(&scanFlags.includeCached, "include-cached", false, "also show devices BlueZ cached from previous scans, not just those actively advertising")
 	c.Flags().StringVar(&scanFlags.name, "name", "", "only print devices whose name matches this substring")
 	c.Flags().StringVar(&scanFlags.prefix, "prefix", "", "only print devices whose address starts with this prefix")
 	c.Flags().BoolVar(&scanFlags.keepFilter, "keep-filter", false, "leave the DiscoveryFilter in place after scan returns (default: clear it)")
@@ -115,14 +115,14 @@ func runScan(cmd *cobra.Command, args []string) error {
 	}
 
 	seen, _, err := runLiveScan(ctx, conn, liveScanConfig{
-		duration:   dur,
-		onlyNew:    scanFlags.onlyNew,
-		keepFilter: scanFlags.keepFilter,
-		matches:    matchesScanFilter,
-		out:        os.Stdout,
-		live:       scanFlags.live,
-		inPlace:    scanFlags.live && !formatIsJSON() && stdoutIsTTY(),
-		jsonMode:   scanFlags.live && formatIsJSON(),
+		duration:     dur,
+		includeCached: scanFlags.includeCached,
+		keepFilter:   scanFlags.keepFilter,
+		matches:      matchesScanFilter,
+		out:          os.Stdout,
+		live:         scanFlags.live,
+		inPlace:      scanFlags.live && !formatIsJSON() && stdoutIsTTY(),
+		jsonMode:     scanFlags.live && formatIsJSON(),
 	})
 	if err != nil {
 		return err
@@ -201,16 +201,16 @@ const liveRowFmt = "%3s  %-17s  %-6s  %5s  %-8s  %s"
 // liveScanConfig parameterises runLiveScan, which backs both the top-level
 // `scan` command and the interactive shell's `scan`.
 type liveScanConfig struct {
-	duration   time.Duration               // >0 = bounded window; 0 = until ctx/stop fires
-	onlyNew    bool                        // exclude BlueZ's pre-existing cached snapshot
-	keepFilter bool                        // leave the DiscoveryFilter in place on return
-	matches    func(bluez.DeviceInfo) bool // row filter; nil accepts everything
-	out        io.Writer                   // render target; defaults to os.Stdout
-	live       bool                        // render incrementally (vs accumulate-only)
-	inPlace    bool                        // redraw one table in place (TTY text)
-	jsonMode   bool                        // emit discrete JSON events instead of a table
-	footer     string                      // optional line under the in-place table
-	stop       <-chan struct{}             // external stop (e.g. Enter pressed); nil = none
+	duration     time.Duration               // >0 = bounded window; 0 = until ctx/stop fires
+	includeCached bool                       // show BlueZ's cached devices alongside live ones
+	keepFilter   bool                        // leave the DiscoveryFilter in place on return
+	matches      func(bluez.DeviceInfo) bool // row filter; nil accepts everything
+	out          io.Writer                   // render target; defaults to os.Stdout
+	live         bool                        // render incrementally (vs accumulate-only)
+	inPlace      bool                        // redraw one table in place (TTY text)
+	jsonMode     bool                        // emit discrete JSON events instead of a table
+	footer       string                      // optional line under the in-place table
+	stop         <-chan struct{}             // external stop (e.g. Enter pressed); nil = none
 }
 
 // indexer assigns each device path a stable 1-based index in first-seen order,
@@ -297,14 +297,11 @@ func runLiveScan(ctx context.Context, conn *bluez.Conn, cfg liveScanConfig) (map
 	}
 	defer func() { _ = conn.StopDiscovery() }()
 
-	// By default include devices BlueZ has cached from before this scan
-	// window. They surface only via GetManagedObjects, not InterfacesAdded,
-	// so a pure event-driven scan misses them. --new opts back into
-	// event-only mode.
 	seen := map[dbus.ObjectPath]bluez.DeviceInfo{}
-	ix := newIndexer()                          // device paths in first-seen order, for stable rows
-	lastSeen := map[dbus.ObjectPath]time.Time{} // most recent observation per device
-	liveLines := 0                              // table lines (incl. header/footer) currently on screen
+	liveDevices := map[dbus.ObjectPath]bool{}    // devices that had real radio events
+	ix := newIndexer()                           // device paths in first-seen order, for stable rows
+	lastSeen := map[dbus.ObjectPath]time.Time{}  // most recent observation per device
+	liveLines := 0                               // table lines (incl. header/footer) currently on screen
 
 	fmtSeen := func(t time.Time) string {
 		if t.IsZero() {
@@ -367,11 +364,15 @@ func runLiveScan(ctx context.Context, conn *bluez.Conn, cfg liveScanConfig) (map
 		}
 	}
 
-	if !cfg.onlyNew {
-		if initial, err := conn.Devices(); err == nil {
-			now := time.Now()
-			for _, di := range initial {
-				seen[di.Path] = di
+	// Always pre-load BlueZ's cached snapshot: PropertiesChanged events
+	// carry only deltas, so without the snapshot cached devices that
+	// advertise during the scan would lose Name/Address/AddrType.
+	if initial, err := conn.Devices(); err == nil {
+		now := time.Now()
+		for _, di := range initial {
+			seen[di.Path] = di
+			if cfg.includeCached {
+				liveDevices[di.Path] = true
 				emit(di, "found", now)
 			}
 		}
@@ -387,20 +388,34 @@ func runLiveScan(ctx context.Context, conn *bluez.Conn, cfg liveScanConfig) (map
 		logf("scanning until stopped…")
 	}
 
+	stripCacheOnly := func() {
+		if !cfg.includeCached {
+			for path := range seen {
+				if !liveDevices[path] {
+					delete(seen, path)
+				}
+			}
+		}
+	}
+
 	for {
 		select {
 		case <-deadline:
+			stripCacheOnly()
 			return seen, ix.order, nil
 		case <-cfg.stop:
+			stripCacheOnly()
 			return seen, ix.order, nil
 		case <-ctx.Done():
+			stripCacheOnly()
 			return seen, ix.order, nil
 		case ev := <-addCh:
 			if props, ok := ev.Interfaces[bluez.IfaceDevice]; ok {
 				di := propsToDevice(ev.Path, props)
-				_, existed := seen[ev.Path]
 				merge(seen, di)
-				if existed {
+				wasLive := liveDevices[ev.Path]
+				liveDevices[ev.Path] = true
+				if wasLive {
 					emit(seen[ev.Path], "update", time.Now())
 				} else {
 					emit(seen[ev.Path], "found", time.Now())
@@ -417,7 +432,11 @@ func runLiveScan(ctx context.Context, conn *bluez.Conn, cfg liveScanConfig) (map
 			prev := di
 			updateDevice(&di, ev.Changed)
 			seen[ev.Path] = di
+			wasLive := liveDevices[ev.Path]
+			liveDevices[ev.Path] = true
 			if !existed {
+				emit(di, "found", time.Now())
+			} else if !wasLive {
 				emit(di, "found", time.Now())
 			} else if kind := classify(prev, di); kind != "" {
 				emit(di, kind, time.Now())
