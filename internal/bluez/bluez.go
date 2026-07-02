@@ -406,20 +406,65 @@ func isAlreadyExists(err error) bool {
 	return strings.Contains(s, "AlreadyExists") || strings.Contains(s, "InProgress")
 }
 
-// WaitServicesResolved polls ServicesResolved until true or ctx is done.
-// BlueZ emits a PropertiesChanged signal when it flips; we poll for simplicity.
+// WaitServicesResolved waits for ServicesResolved to flip true, using a D-Bus
+// signal match so we react immediately instead of polling. Falls back to
+// polling if the signal subscription fails.
 func (d *Device) WaitServicesResolved(ctx context.Context) error {
-	t := time.NewTicker(150 * time.Millisecond)
-	defer t.Stop()
+	// Already resolved? (common after a cached reconnect)
+	if ok, err := d.ServicesResolved(); err == nil && ok {
+		return nil
+	}
+
+	// Subscribe to PropertiesChanged on this device so we wake up the
+	// instant BlueZ flips ServicesResolved, instead of polling every 150ms.
+	sigCh := make(chan *dbus.Signal, 4)
+	matchOpt := dbus.WithMatchObjectPath(d.Path)
+	if err := d.conn.Bus.AddMatchSignal(
+		dbus.WithMatchInterface("org.freedesktop.DBus.Properties"),
+		dbus.WithMatchMember("PropertiesChanged"),
+		matchOpt,
+	); err == nil {
+		d.conn.Bus.Signal(sigCh)
+		defer func() {
+			d.conn.Bus.RemoveSignal(sigCh)
+			_ = d.conn.Bus.RemoveMatchSignal(
+				dbus.WithMatchInterface("org.freedesktop.DBus.Properties"),
+				dbus.WithMatchMember("PropertiesChanged"),
+				matchOpt,
+			)
+		}()
+	} else {
+		close(sigCh)
+	}
+
+	// Poll as a backstop (covers signal setup failure and races where the
+	// property flipped between our initial check and the signal subscription).
+	poll := time.NewTicker(500 * time.Millisecond)
+	defer poll.Stop()
+
 	for {
-		ok, err := d.ServicesResolved()
-		if err == nil && ok {
-			return nil
-		}
 		select {
 		case <-ctx.Done():
 			return fmt.Errorf("waiting for ServicesResolved: %w", ctx.Err())
-		case <-t.C:
+		case sig, ok := <-sigCh:
+			if !ok {
+				// Signal channel closed (subscription failed); rely on poll.
+				sigCh = nil
+				continue
+			}
+			if sig == nil || len(sig.Body) < 2 {
+				continue
+			}
+			changed, _ := sig.Body[1].(map[string]dbus.Variant)
+			if v, found := changed["ServicesResolved"]; found {
+				if resolved, _ := v.Value().(bool); resolved {
+					return nil
+				}
+			}
+		case <-poll.C:
+			if ok, err := d.ServicesResolved(); err == nil && ok {
+				return nil
+			}
 		}
 	}
 }

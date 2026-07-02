@@ -53,7 +53,7 @@ mtu --set/--reset) require root.`
 	pf.StringVarP(&root.bdaddr, "bdaddr", "b", "", "remote BD_ADDR (XX:XX:XX:XX:XX:XX)")
 	// --addr-type lost its -t short form to --timeout (org-wide convention).
 	pf.StringVar(&root.addrType, "addr-type", "", "address type: public | random (auto if blank)")
-	pf.IntVarP(&root.timeout, "timeout", "t", 25, "operation timeout, seconds")
+	pf.IntVarP(&root.timeout, "timeout", "t", 45, "operation timeout, seconds")
 	pf.StringVarP(&root.format, "format", "o", "text", "output format: text | json | jsonl (json/jsonl output is authoritative; do not re-run in text mode)")
 	// --json is kept as a deprecated alias for --format jsonl. Hidden so
 	// the help output points users at the canonical -o/--format flag.
