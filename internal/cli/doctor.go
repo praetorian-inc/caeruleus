@@ -14,6 +14,7 @@ import (
 
 	"github.com/praetorian-inc/caeruleus/internal/bdaddr"
 	"github.com/praetorian-inc/caeruleus/internal/bluez"
+	"github.com/praetorian-inc/caeruleus/internal/smp"
 )
 
 func newDoctorCmd() *cobra.Command {
@@ -31,7 +32,9 @@ Checks (per adapter):
   - Adapter1.Discovering (anything stuck from earlier?)
   - BlueZ-cached Address vs MGMT chip-live Address (mismatch = stale cache)
   - LE scan healthy (brief 2s discovery probe)
-  - ExchangeMTU configured (in safe band for typical peripherals?)`,
+  - ExchangeMTU configured (in safe band for typical peripherals?)
+  - Transport type (USB vs UART — UART controllers can't use raw HCI safely)
+  - Kernel BT module loaded`,
 		RunE: runDoctor,
 	}
 }
@@ -137,6 +140,33 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 		})
 	default:
 		add(doctorFinding{Check: "ExchangeMTU", Status: "OK", Value: fmt.Sprintf("%d", confMTU)})
+	}
+
+	// Controller transport type — UART-attached controllers (RPi onboard BT)
+	// cannot safely use HCI_CHANNEL_USER (assess pairing, bdaddr write).
+	if idx, err := adapterIndex(root.adapter); err == nil {
+		if smp.IsUARTTransport(idx) {
+			add(doctorFinding{
+				Check:  "Transport",
+				Status: "WARN",
+				Value:  "UART (e.g. Raspberry Pi onboard BT)",
+				Fix:    "use a USB BT dongle for commands that require raw HCI (assess pairing, bdaddr)",
+			})
+		} else {
+			add(doctorFinding{Check: "Transport", Status: "OK", Value: "USB/PCI"})
+		}
+	}
+
+	// Kernel BT module availability — HCI monitor requires CONFIG_BT_MONITOR.
+	if _, err := os.Stat("/sys/module/bluetooth"); os.IsNotExist(err) {
+		add(doctorFinding{
+			Check:  "Kernel BT module",
+			Status: "FAIL",
+			Value:  "bluetooth module not loaded",
+			Fix:    "sudo modprobe bluetooth",
+		})
+	} else {
+		add(doctorFinding{Check: "Kernel BT module", Status: "OK", Value: "loaded"})
 	}
 
 	if formatIsJSON() {
