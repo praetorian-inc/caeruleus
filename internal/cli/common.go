@@ -30,6 +30,7 @@ type session struct {
 // openSession dials BlueZ, optionally connects to bdaddr, and enumerates GATT.
 // If addr is "", no Device is attached.
 func openSession(ctx context.Context, addr string, connect bool) (*session, error) {
+	logf("dialing BlueZ on adapter %s", root.adapter)
 	conn, err := bluez.Dial(root.adapter)
 	if err != nil {
 		return nil, err
@@ -40,21 +41,28 @@ func openSession(ctx context.Context, addr string, connect bool) (*session, erro
 	}
 	s.device = conn.Device(addr)
 	if root.addrType != "" {
+		logf("setting address type %s for %s", root.addrType, addr)
 		// best-effort; old kernels don't expose this on unknown devices
 		_ = s.device.SetAddressType(root.addrType)
 	}
 	if connect {
 		timeout := time.Duration(root.timeout) * time.Second
+		logf("connecting to %s (timeout %s)", addr, timeout)
+		t0 := time.Now()
 		if err := s.device.Connect(ctx, timeout); err != nil {
 			conn.Close()
 			return nil, err
 		}
+		logf("connected to %s in %s", addr, time.Since(t0).Round(time.Millisecond))
+		logf("enumerating GATT tree for %s", addr)
 		t, err := conn.EnumerateGatt(s.device.Path)
 		if err != nil {
 			_ = s.device.Disconnect()
 			conn.Close()
 			return nil, err
 		}
+		logf("GATT tree: %d services, %d characteristics, %d descriptors",
+			len(t.Services), len(t.Characteristics), len(t.Descriptors))
 		s.tree = t
 	}
 	return s, nil
