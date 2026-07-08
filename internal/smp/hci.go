@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -56,15 +57,27 @@ var (
 
 // Dev is an open HCI user channel with at most one active LE connection.
 type Dev struct {
-	fd         int
-	index      uint16
-	connHandle uint16
+	fd           int
+	index        uint16
+	connHandle   uint16
+	stoppedBluez bool // we stopped bluetoothd in Open; Close restarts it
+}
+
+// bluezActive reports whether the bluetooth systemd service is running.
+func bluezActive() bool {
+	return exec.Command("systemctl", "is-active", "--quiet", "bluetooth").Run() == nil
+}
+
+// systemctlBluez runs `systemctl <action> bluetooth` (action = start|stop).
+func systemctlBluez(action string) error {
+	return exec.Command("systemctl", action, "bluetooth").Run()
 }
 
 // IsUARTTransport reports whether the HCI controller at the given index is
-// attached via a UART serial transport (e.g. Raspberry Pi onboard BT).
-// Taking HCI_CHANNEL_USER on a UART controller tears down the serial link,
-// and HCIDEVUP cannot recover it — only re-running btattach/hciattach can.
+// attached via a UART serial transport (e.g. Raspberry Pi onboard BT). Raw
+// (HCI_CHANNEL_USER) ops still work on such controllers — Open manages
+// bluetoothd and the controller recovers via HCIDEVUP — so this is used only
+// for a doctor advisory, not to refuse the operation.
 func IsUARTTransport(index uint16) bool {
 	// Resolve the controller's sysfs device path and classify by transport.
 	// USB/PCI dongles resolve under a path containing "/usb" or "/pci".
@@ -95,44 +108,59 @@ func IsUARTTransport(index uint16) bool {
 }
 
 // Open takes over the HCI controller `index` (e.g. 0 for hci0) via the user
-// channel. The controller is brought down first; bluetoothd must not reclaim
-// it while open (stop it, or it will fight for the adapter).
+// channel. bluetoothd must not hold the controller while the user channel is
+// open, so Open stops bluetoothd for the duration and Close restarts it (only
+// if Open stopped it).
 //
-// On UART-attached controllers (e.g. Raspberry Pi onboard Bluetooth), taking
-// HCI_CHANNEL_USER tears down the serial transport irreversibly — only
-// restarting btattach/hciattach can recover it. Open refuses these controllers
-// unless the CAERULEUS_FORCE_HCI env var is set.
-func Open(index uint16) (*Dev, error) {
-	if IsUARTTransport(index) && os.Getenv("CAERULEUS_FORCE_HCI") == "" {
-		return nil, fmt.Errorf(
-			"hci%d appears to be a UART-attached controller (e.g. Raspberry Pi onboard BT); "+
-				"taking HCI_CHANNEL_USER will tear down the serial transport and the adapter "+
-				"cannot be recovered without restarting btattach/hciattach. Use a USB BT dongle, "+
-				"or set CAERULEUS_FORCE_HCI=1 to override this check", index)
+// This works on UART-attached controllers (e.g. Raspberry Pi onboard BT) too:
+// the controller recovers via HCIDEVUP on Close. The one thing that DOES wedge
+// a UART controller is re-running btattach/hciattach (hciuart.service) while it
+// is attached — caeruleus never does that.
+func Open(index uint16) (_ *Dev, err error) {
+	// HCI_CHANNEL_USER needs exclusive control, so bluetoothd must not hold the
+	// controller. Stop bluetoothd for the duration (Close restarts it if we
+	// stopped it). This is also what makes raw ops work on UART-attached
+	// controllers (e.g. Raspberry Pi onboard BT): the controller recovers via
+	// HCIDEVUP as long as bluetoothd isn't fighting and btattach/hciattach is
+	// NOT re-run (re-running it is what actually wedges the UART transport).
+	var stoppedBluez bool
+	if bluezActive() {
+		if e := systemctlBluez("stop"); e != nil {
+			return nil, fmt.Errorf("stop bluetoothd for exclusive HCI access on hci%d: %w (needs root)", index, e)
+		}
+		stoppedBluez = true
+		time.Sleep(300 * time.Millisecond) // let bluetoothd release the adapter
 	}
+	// Restore bluetoothd if we fail before handing ownership to a *Dev.
+	defer func() {
+		if err != nil && stoppedBluez {
+			_ = systemctlBluez("start")
+		}
+	}()
 
 	// Bring the controller down so the user channel can bind exclusively.
-	if ctrl, err := unix.Socket(unix.AF_BLUETOOTH, unix.SOCK_RAW|unix.SOCK_CLOEXEC, btprotoHCI); err == nil {
+	if ctrl, e := unix.Socket(unix.AF_BLUETOOTH, unix.SOCK_RAW|unix.SOCK_CLOEXEC, btprotoHCI); e == nil {
 		_ = unix.IoctlSetInt(ctrl, hciDevDown, int(index))
 		unix.Close(ctrl)
 	}
-	fd, err := unix.Socket(unix.AF_BLUETOOTH, unix.SOCK_RAW|unix.SOCK_CLOEXEC, btprotoHCI)
-	if err != nil {
-		if errors.Is(err, unix.EPERM) || errors.Is(err, unix.EACCES) {
-			return nil, fmt.Errorf("AF_BLUETOOTH socket: %w (run with sudo)", err)
+	fd, e := unix.Socket(unix.AF_BLUETOOTH, unix.SOCK_RAW|unix.SOCK_CLOEXEC, btprotoHCI)
+	if e != nil {
+		if errors.Is(e, unix.EPERM) || errors.Is(e, unix.EACCES) {
+			return nil, fmt.Errorf("AF_BLUETOOTH socket: %w (run with sudo)", e)
 		}
-		return nil, fmt.Errorf("AF_BLUETOOTH socket: %w", err)
+		return nil, fmt.Errorf("AF_BLUETOOTH socket: %w", e)
 	}
 	sa := &unix.SockaddrHCI{Dev: index, Channel: hciChannelUser}
-	if err := unix.Bind(fd, sa); err != nil {
+	if e := unix.Bind(fd, sa); e != nil {
 		unix.Close(fd)
 		bringUp(index) // we downed it above; restore so the adapter isn't stranded
-		return nil, fmt.Errorf("bind HCI user channel on hci%d: %w (is bluetoothd holding the adapter? stop it: systemctl stop bluetooth)", index, err)
+		return nil, fmt.Errorf("bind HCI user channel on hci%d: %w", index, e)
 	}
-	d := &Dev{fd: fd, index: index, connHandle: 0xffff}
-	if err := d.reset(); err != nil {
+	d := &Dev{fd: fd, index: index, connHandle: 0xffff, stoppedBluez: stoppedBluez}
+	stoppedBluez = false // ownership transferred to d; d.Close restarts bluetoothd
+	if e := d.reset(); e != nil {
 		d.Close()
-		return nil, err
+		return nil, e
 	}
 	return d, nil
 }
@@ -153,6 +181,10 @@ func (d *Dev) Close() error {
 	}
 	err := unix.Close(d.fd)
 	bringUp(d.index) // restore so bluetoothd can reclaim the adapter
+	if d.stoppedBluez {
+		_ = systemctlBluez("start") // restart the bluetoothd we stopped in Open
+		d.stoppedBluez = false
+	}
 	return err
 }
 

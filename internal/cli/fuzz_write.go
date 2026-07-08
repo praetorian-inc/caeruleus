@@ -144,6 +144,13 @@ func runFuzzWrite(cmd *cobra.Command, args []string) error {
 		statusf("--include implies --raw (Prepare/Execute Write are only available via the L2CAP path)")
 		useRaw = true
 	}
+	// Raw L2CAP (and prep/exec) need root; fail fast before opening a BLE
+	// session so the error is immediate rather than after a connect.
+	if useRaw {
+		if err := requireRoot("fuzz write --raw"); err != nil {
+			return err
+		}
+	}
 
 	rngSeed := fuzzWriteFlags.rngSeed
 	if rngSeed == 0 {
