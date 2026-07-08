@@ -55,6 +55,8 @@ func runEnumerate(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+	logf("enumerate %s (values=%v, compact=%v, max-len=%d)",
+		addr, enumerateFlags.readValues, enumerateFlags.compact, enumerateFlags.maxLen)
 	ctx, cancel := ctxWithRootTimeout()
 	defer cancel()
 
@@ -64,7 +66,9 @@ func runEnumerate(cmd *cobra.Command, args []string) error {
 	}
 	defer s.close()
 
+	logf("building enumeration rows (read values=%v)", enumerateFlags.readValues)
 	rows := buildEnumRows(s, enumerateFlags.readValues)
+	logf("enumerated %d characteristics", len(rows))
 	if formatIsJSON() {
 		return emitJSON(rows)
 	}
@@ -189,10 +193,14 @@ func buildEnumRows(s *session, readValues bool) []enumRow {
 			Properties:    formatProps(ch.Flags),
 		}
 		if readValues && propsCan(ch.Flags, "read") {
+			logf("reading characteristic 0x%04x (%s)", ch.Handle, ch.UUID)
 			c := s.conn.Characteristic(ch.Path)
 			if v, err := c.ReadValue(0); err == nil {
 				row.ValueHex = hex.EncodeToString(v)
 				row.ValueASCII = asciiize(v)
+				logf("read 0x%04x: %d bytes", ch.Handle, len(v))
+			} else {
+				logf("read 0x%04x failed: %v", ch.Handle, err)
 			}
 		}
 		for _, d := range descs[string(ch.Path)] {
