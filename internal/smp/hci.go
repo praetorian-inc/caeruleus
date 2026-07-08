@@ -4,6 +4,8 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -59,10 +61,56 @@ type Dev struct {
 	connHandle uint16
 }
 
+// IsUARTTransport reports whether the HCI controller at the given index is
+// attached via a UART serial transport (e.g. Raspberry Pi onboard BT).
+// Taking HCI_CHANNEL_USER on a UART controller tears down the serial link,
+// and HCIDEVUP cannot recover it — only re-running btattach/hciattach can.
+func IsUARTTransport(index uint16) bool {
+	// Resolve the controller's sysfs device path and classify by transport.
+	// USB/PCI dongles resolve under a path containing "/usb" or "/pci".
+	// UART/serdev-attached controllers (e.g. Raspberry Pi onboard BCM43xx
+	// over ttyAMA0) resolve under a serial/tty node, e.g.
+	// /sys/devices/platform/soc/fe201000.serial/tty/ttyAMA0/hci0, and have
+	// no device/modalias or type file at all — which is exactly why the old
+	// modalias/type checks missed them and defaulted to "not UART".
+	base := fmt.Sprintf("/sys/class/bluetooth/hci%d", index)
+	if real, err := filepath.EvalSymlinks(base); err == nil {
+		low := strings.ToLower(real)
+		switch {
+		case strings.Contains(low, "/usb"), strings.Contains(low, "/pci"):
+			return false
+		case strings.Contains(low, ".serial"), strings.Contains(low, "/tty"), strings.Contains(low, "/serial"):
+			return true
+		}
+	}
+	// Fallback: modalias (USB/PCI dongles expose usb:/pci:; serdev usually
+	// has none). A non usb:/pci: modalias implies a platform/UART controller.
+	if data, err := os.ReadFile(base + "/device/modalias"); err == nil {
+		m := strings.TrimSpace(string(data))
+		return !strings.HasPrefix(m, "usb:") && !strings.HasPrefix(m, "pci:")
+	}
+	// Path didn't clearly indicate USB/PCI and there's no modalias: assume
+	// not UART, to avoid false positives that would block USB dongles.
+	return false
+}
+
 // Open takes over the HCI controller `index` (e.g. 0 for hci0) via the user
 // channel. The controller is brought down first; bluetoothd must not reclaim
 // it while open (stop it, or it will fight for the adapter).
+//
+// On UART-attached controllers (e.g. Raspberry Pi onboard Bluetooth), taking
+// HCI_CHANNEL_USER tears down the serial transport irreversibly — only
+// restarting btattach/hciattach can recover it. Open refuses these controllers
+// unless the CAERULEUS_FORCE_HCI env var is set.
 func Open(index uint16) (*Dev, error) {
+	if IsUARTTransport(index) && os.Getenv("CAERULEUS_FORCE_HCI") == "" {
+		return nil, fmt.Errorf(
+			"hci%d appears to be a UART-attached controller (e.g. Raspberry Pi onboard BT); "+
+				"taking HCI_CHANNEL_USER will tear down the serial transport and the adapter "+
+				"cannot be recovered without restarting btattach/hciattach. Use a USB BT dongle, "+
+				"or set CAERULEUS_FORCE_HCI=1 to override this check", index)
+	}
+
 	// Bring the controller down so the user channel can bind exclusively.
 	if ctrl, err := unix.Socket(unix.AF_BLUETOOTH, unix.SOCK_RAW|unix.SOCK_CLOEXEC, btprotoHCI); err == nil {
 		_ = unix.IoctlSetInt(ctrl, hciDevDown, int(index))
