@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -65,31 +66,32 @@ type Dev struct {
 // Taking HCI_CHANNEL_USER on a UART controller tears down the serial link,
 // and HCIDEVUP cannot recover it — only re-running btattach/hciattach can.
 func IsUARTTransport(index uint16) bool {
-	// The kernel exposes the bus type in sysfs. UART-attached controllers
-	// (btattach/hciattach over /dev/ttyAMA*) report "uart"; USB dongles
-	// report "usb". If the file is absent we assume it's safe to proceed.
-	path := fmt.Sprintf("/sys/class/bluetooth/hci%d/device/modalias", index)
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return false
+	// Resolve the controller's sysfs device path and classify by transport.
+	// USB/PCI dongles resolve under a path containing "/usb" or "/pci".
+	// UART/serdev-attached controllers (e.g. Raspberry Pi onboard BCM43xx
+	// over ttyAMA0) resolve under a serial/tty node, e.g.
+	// /sys/devices/platform/soc/fe201000.serial/tty/ttyAMA0/hci0, and have
+	// no device/modalias or type file at all — which is exactly why the old
+	// modalias/type checks missed them and defaulted to "not UART".
+	base := fmt.Sprintf("/sys/class/bluetooth/hci%d", index)
+	if real, err := filepath.EvalSymlinks(base); err == nil {
+		low := strings.ToLower(real)
+		switch {
+		case strings.Contains(low, "/usb"), strings.Contains(low, "/pci"):
+			return false
+		case strings.Contains(low, ".serial"), strings.Contains(low, "/tty"), strings.Contains(low, "/serial"):
+			return true
+		}
 	}
-	modalias := strings.TrimSpace(string(data))
-	// UART-attached controllers have a platform or serial modalias (e.g.
-	// "platform:..." or "of:...") rather than "usb:..." or "pci:...".
-	// A direct check: if it doesn't start with usb: or pci:, and the
-	// transport type file confirms UART, flag it.
-	if strings.HasPrefix(modalias, "usb:") || strings.HasPrefix(modalias, "pci:") {
-		return false
+	// Fallback: modalias (USB/PCI dongles expose usb:/pci:; serdev usually
+	// has none). A non usb:/pci: modalias implies a platform/UART controller.
+	if data, err := os.ReadFile(base + "/device/modalias"); err == nil {
+		m := strings.TrimSpace(string(data))
+		return !strings.HasPrefix(m, "usb:") && !strings.HasPrefix(m, "pci:")
 	}
-	// Also check the explicit transport type exposed on some kernels.
-	typePath := fmt.Sprintf("/sys/class/bluetooth/hci%d/type", index)
-	if tdata, err := os.ReadFile(typePath); err == nil {
-		// 1=USB, 2=PCCARD, 3=UART, 4=RS232, ...
-		t := strings.TrimSpace(string(tdata))
-		return t == "3" || t == "4"
-	}
-	// Non-USB/PCI modalias without an explicit type file — warn conservatively.
-	return !strings.HasPrefix(modalias, "usb:") && !strings.HasPrefix(modalias, "pci:")
+	// Path didn't clearly indicate USB/PCI and there's no modalias: assume
+	// not UART, to avoid false positives that would block USB dongles.
+	return false
 }
 
 // Open takes over the HCI controller `index` (e.g. 0 for hci0) via the user
