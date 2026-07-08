@@ -64,7 +64,7 @@ Add `-o json` to any command to get machine-readable output for scripting or rep
 ### Discovery
 | Command | Purpose |
 |---|---|
-| `scan [-d secs]` | LE discovery; shows address, type, RSSI, inferred device type (from GAP Appearance + service UUIDs), and name. `--new` hides cached devices. `--live` shows a self-updating table as devices appear (RSSI/last-seen refresh in place; runs until Ctrl-C unless `-d` given), each row carrying a 1-based index. `-o jsonl` streams found/update events. |
+| `scan [-d secs]` | LE discovery; shows address, type, RSSI, inferred device type (from GAP Appearance + service UUIDs), and name. `--include-cached` also shows devices BlueZ cached from earlier scans (default is active-only). `--live` shows a self-updating table as devices appear (RSSI/last-seen refresh in place; runs until Ctrl-C unless `-d` given), each row carrying a 1-based index. `-o jsonl` streams found/update events. |
 | `enumerate -b A [--values] [--compact]` | Full GATT tree; `--values` reads each characteristic; `--compact` is one line/char. |
 | `primary -b A` / `characteristics -b A` | gatttool-style service / characteristic listing. |
 
