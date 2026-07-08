@@ -33,7 +33,7 @@ Checks (per adapter):
   - BlueZ-cached Address vs MGMT chip-live Address (mismatch = stale cache)
   - LE scan healthy (brief 2s discovery probe)
   - ExchangeMTU configured (in safe band for typical peripherals?)
-  - Transport type (USB vs UART — UART controllers can't use raw HCI safely)
+  - Transport type (USB vs UART; raw HCI on UART auto-manages bluetoothd)
   - Kernel BT module loaded`,
 		RunE: runDoctor,
 	}
@@ -143,14 +143,16 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	}
 
 	// Controller transport type — UART-attached controllers (RPi onboard BT)
-	// cannot safely use HCI_CHANNEL_USER (assess pairing, bdaddr write).
+	// Raw (HCI_CHANNEL_USER) ops auto-manage bluetoothd and the controller
+	// recovers via HCIDEVUP, so UART is supported — the only hazard is
+	// re-running btattach/hciattach (hciuart) on an attached UART controller.
 	if idx, err := adapterIndex(root.adapter); err == nil {
 		if smp.IsUARTTransport(idx) {
 			add(doctorFinding{
 				Check:  "Transport",
 				Status: "WARN",
 				Value:  "UART (e.g. Raspberry Pi onboard BT)",
-				Fix:    "use a USB BT dongle for commands that require raw HCI (assess pairing, bdaddr)",
+				Fix:    "raw HCI (assess pairing) auto-stops/restarts bluetoothd here; do NOT run 'systemctl restart hciuart' while attached or it wedges the controller (needs a reboot)",
 			})
 		} else {
 			add(doctorFinding{Check: "Transport", Status: "OK", Value: "USB/PCI"})
