@@ -19,10 +19,10 @@ Built by offensive security engineers to replace the usual pile of `bettercap`, 
 
 - [Why Caeruleus?](#why-caeruleus)
 - [Features](#features)
+- [Agents Welcome](#agents-welcome)
 - [Installation](#installation)
 - [Quick Start](#quick-start)
 - [Command Reference](#command-reference)
-- [Agents Welcome](#agents-welcome)
 - [Assessment Workflows](#assessment-workflows)
 - [Extending Caeruleus](#extending-caeruleus)
 - [Limitations](#limitations)
