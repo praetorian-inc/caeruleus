@@ -1,6 +1,6 @@
 <img width="1200" height="628" alt="Caeruleus - Bluetooth Low Energy security testing, consolidated into one Go binary" src="https://github.com/user-attachments/assets/bd67cbb9-64db-4fa6-9f63-5ea5f3a1610b" />
 
-# Caeruleus: BLE Security Testing, Consolidated
+# Caeruleus: BLE Testing Toolkit
 
 > One Go binary for the entire Bluetooth Low Energy assessment workflow on Linux/BlueZ: scan, enumerate, read/write/notify, fuzz, and structured security assessment, with JSON output for scripts and agents.
 
@@ -9,11 +9,11 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/praetorian-inc/caeruleus)](https://goreportcard.com/report/github.com/praetorian-inc/caeruleus)
 [![Release](https://img.shields.io/github/v/release/praetorian-inc/caeruleus?sort=semver)](https://github.com/praetorian-inc/caeruleus/releases)
 
-**Caeruleus** consolidates Bluetooth Low Energy (BLE) security testing into a single Go binary built on the Linux BlueZ stack. It talks to peripherals over BlueZ D-Bus and raw L2CAP/HCI sockets and covers the whole lifecycle: discover devices, browse and read/write the GATT tree, capture notifications, fuzz writable characteristics, and run repeatable security-assessment workflows. Every command emits structured `-o json` / `-o jsonl` output for scripting, reporting, and LLM agents. No Python runtime, no MCP server, and it never shells out to other tools; all it needs is a BLE adapter and BlueZ.
+**Caeruleus** consolidates Bluetooth Low Energy (BLE) security testing into a single Go binary built on the Linux BlueZ stack. It talks to peripherals over BlueZ D-Bus and raw L2CAP/HCI sockets and covers the whole lifecycle: discover devices, browse and read/write the GATT tree, capture notifications, fuzz writable characteristics, and run repeatable security-assessment workflows. Every command emits structured `-o json` / `-o jsonl` output for scripting, reporting, and LLM agents. 
 
 Built by offensive security engineers to replace the usual pile of `bettercap`, `gatttool`, `hcitool`, `bluetoothctl`, and one-off Bleak scripts, Caeruleus keeps the abstractions at the level a human or agent actually works at.
 
-*caeruleus*: Latin for "blue," with the **LE** capitalized for Low Energy.
+*caeruleus*: Latin for the "blue" in Bluetooth Low Energy
 
 ## Table of Contents
 
@@ -69,6 +69,12 @@ Caeruleus replaces that entire pile with one consistent command surface:
 **Scripting and automation.** `serve`/`send` hold one GATT link open over a Unix socket so a script or agent avoids the ~1.5s reconnect cost per command; `batch` runs commands from stdin over a single persistent connection; `listen --trigger-value` sets up a notification, fires a write, and captures the response atomically.
 
 **Convenience details.** Device-type inference from GAP Appearance plus advertised services (a watch shows as "Smartwatch," not a raw appearance code); forgiving input parsing (handles as `0x002a`, `0X2A`, or `42`; hex as `deadbeef`, `de:ad:be:ef`, or `0xdeadbeef`); `caeruleus recipes` lists and keyword-searches 19 common workflows; `conn-params` surfaces the negotiated interval, latency, and supervision timeout that neither gatttool nor bettercap expose.
+
+## Agents Welcome
+
+Caeruleus treats LLM agents as first-class users. `-o json` / `-o jsonl` give token-efficient, structured output an agent parses without scraping human-formatted tables, and the repo ships a portable [Agent Skill](https://agentskills.io) (`skills/caeruleus/SKILL.md`) that teaches any Agent Skills-compatible assistant the command surface and a recommended assessment methodology. Point an agent at a device and it runs the whole methodology end to end.
+
+In our benchmark, Opus 4.8 (xHigh) with Caeruleus and its skill completed the task in **62% of the time and 70% of the tokens** of the same model with free tool choice (which reached for `hcitool` and Bleak scripts).
 
 ## Installation
 
@@ -147,12 +153,6 @@ Global flags on every command: `-b/--bdaddr`, `-i/--adapter` (default `hci0`), `
 
 New to the tool, or coming from bettercap / gatttool / bluetoothctl / nRF Connect / Bleak? Run `caeruleus recipes` for use-case-first examples. For the full per-command reference, assessment methodology, and hardware/adapter notes, see the [**Wiki**](https://github.com/praetorian-inc/caeruleus/wiki) and [`skills/caeruleus/SKILL.md`](skills/caeruleus/SKILL.md).
 
-## Agents Welcome
-
-Caeruleus treats LLM agents as first-class users. `-o json` / `-o jsonl` give token-efficient, structured output an agent parses without scraping human-formatted tables, and the repo ships a portable [Agent Skill](https://agentskills.io) (`skills/caeruleus/SKILL.md`) that teaches any Agent Skills-compatible assistant the command surface and a recommended assessment methodology. Point an agent at a device and it runs the whole methodology end to end.
-
-In our benchmark, Opus 4.8 (xHigh) with Caeruleus and its skill completed the task in **62% of the time and 70% of the tokens** of the same model with free tool choice (which reached for `hcitool` and Bleak scripts).
-
 ## Assessment Workflows
 
 Reading and writing handles is the easy part. Caeruleus turns the ad-hoc "let me check a few things" phase into repeatable, structured assessment. `recon` fingerprints the device and audits its GATT tree; each `assess` subcommand probes one class of weakness:
@@ -220,7 +220,7 @@ Issues and pull requests are welcome, especially new `assess` workflows. Please 
 
 ## Security
 
-Caeruleus is designed for **authorized security testing only**. Only use it against devices you own or have explicit permission to assess; scanning, connecting to, and writing to BLE peripherals affects real hardware. Report security issues in Caeruleus itself via [GitHub Issues](https://github.com/praetorian-inc/caeruleus/issues).
+Caeruleus is designed for **authorized security testing only**. Only use it against devices you own or have explicit permission to assess; scanning, connecting to, and writing to BLE peripherals affects real hardware. 
 
 ## License
 
