@@ -153,6 +153,8 @@ Global flags on every command: `-b/--bdaddr`, `-i/--adapter` (default `hci0`), `
 
 New to the tool, or coming from bettercap / gatttool / bluetoothctl / nRF Connect / Bleak? Run `caeruleus recipes` for use-case-first examples. For the full per-command reference, assessment methodology, and hardware/adapter notes, see the [**Wiki**](https://github.com/praetorian-inc/caeruleus/wiki) and [`skills/caeruleus/SKILL.md`](skills/caeruleus/SKILL.md).
 
+> On older BlueZ (e.g. 5.55) that hides the remote GAP/GATT services from its D-Bus GATT tree, `enumerate --raw` (root) discovers the database directly over the ATT channel for a complete, host-independent view with the device's true handles.
+
 ## Assessment Workflows
 
 Reading and writing handles is the easy part. Caeruleus turns the ad-hoc "let me check a few things" phase into repeatable, structured assessment. `recon` fingerprints the device and audits its GATT tree; each `assess` subcommand probes one class of weakness:

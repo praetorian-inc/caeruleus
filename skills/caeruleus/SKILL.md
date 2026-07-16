@@ -65,7 +65,7 @@ Add `-o json` to any command to get machine-readable output for scripting or rep
 | Command | Purpose |
 |---|---|
 | `scan [-d secs]` | LE discovery; shows address, type, RSSI, inferred device type (from GAP Appearance + service UUIDs), and name. `--include-cached` also shows devices BlueZ cached from earlier scans (default is active-only). `--live` shows a self-updating table as devices appear (RSSI/last-seen refresh in place; runs until Ctrl-C unless `-d` given), each row carrying a 1-based index. `-o jsonl` streams found/update events. |
-| `enumerate -b A [--values] [--compact]` | Full GATT tree; `--values` reads each characteristic; `--compact` is one line/char. |
+| `enumerate -b A [--values] [--compact] [--raw]` | Full GATT tree; `--values` reads each characteristic; `--compact` is one line/char. `--raw` (root) discovers directly over ATT for a host/BlueZ-independent view with the device's true handles, incl. GAP/GATT services older BlueZ hides. |
 | `primary -b A` / `characteristics -b A` | gatttool-style service / characteristic listing. |
 
 ### GATT operations
@@ -171,6 +171,7 @@ Then **correlate**: merge all `findings[]`, dedupe by `(uuid, title)`, rank by s
 
 ## Operational notes
 
+- **Missing GAP/GATT services, or handles that seem off by one?** Older BlueZ (e.g. 5.55) omits the remote GAP (0x1800) / GATT (0x1801) services from its D-Bus GATT tree, so plain `enumerate` can miss characteristics (e.g. Device Name 0x2A00) and report handles shifted from the device's true ATT handles. Run `sudo caeruleus enumerate -b A --raw` to walk the database directly over ATT: a complete, host-independent view with the device's true value handles (plus `decl_handle` in JSON). Needs root.
 - **`-o json` / `-o jsonl` output is authoritative and complete.** Do not re-run a command in text mode after running it with `-o json`. The JSON contains every field the text table shows (and more). Parse it directly — re-running doubles the BLE traffic for zero additional data.
 - **Random vs public addresses:** if a connect fails, pass `--addr-type random` (or `public`). `scan` shows each device's type.
 - **Stuck state:** "Operation already in progress" / `Connected=true` that won't clear -> `caeruleus forget -b A` then retry, or `caeruleus adapter power cycle`. `doctor` suggests the fix.

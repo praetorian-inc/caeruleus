@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 	"unicode"
 
 	"github.com/jedib0t/go-pretty/v6/table"
@@ -12,12 +13,14 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/praetorian-inc/caeruleus/internal/bluez"
+	"github.com/praetorian-inc/caeruleus/internal/l2cap"
 )
 
 var enumerateFlags struct {
 	readValues bool
 	maxLen     int
 	compact    bool
+	raw        bool
 }
 
 func newEnumerateCmd() *cobra.Command {
@@ -30,6 +33,7 @@ func newEnumerateCmd() *cobra.Command {
 	c.Flags().BoolVar(&enumerateFlags.readValues, "values", false, "read each readable characteristic and include its value (slow; opt in only)")
 	c.Flags().IntVar(&enumerateFlags.maxLen, "max-len", 64, "truncate displayed values to this many bytes")
 	c.Flags().BoolVar(&enumerateFlags.compact, "compact", false, "emit one key=value line per characteristic instead of the wide table (token-efficient for scripts / LLMs)")
+	c.Flags().BoolVar(&enumerateFlags.raw, "raw", false, "discover the GATT DB directly over raw ATT (host/BlueZ-independent; TRUE handles, incl. GAP/GATT services BlueZ may hide); needs root")
 	return c
 }
 
@@ -37,6 +41,7 @@ type enumRow struct {
 	Service        string    `json:"service"`
 	ServiceHandle  uint16    `json:"service_handle"`
 	CharHandle     uint16    `json:"char_handle"`
+	DeclHandle     uint16    `json:"decl_handle,omitempty"` // characteristic declaration handle (raw path only; char_handle is the value handle)
 	CharUUID       string    `json:"char_uuid"`
 	Properties     string    `json:"properties"`
 	ValueHex       string    `json:"value_hex,omitempty"`
@@ -55,20 +60,46 @@ func runEnumerate(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	logf("enumerate %s (values=%v, compact=%v, max-len=%d)",
-		addr, enumerateFlags.readValues, enumerateFlags.compact, enumerateFlags.maxLen)
-	ctx, cancel := ctxWithRootTimeout()
-	defer cancel()
+	logf("enumerate %s (raw=%v, values=%v, compact=%v, max-len=%d)",
+		addr, enumerateFlags.raw, enumerateFlags.readValues, enumerateFlags.compact, enumerateFlags.maxLen)
 
-	s, err := openSession(ctx, addr, true)
-	if err != nil {
-		return err
+	var rows []enumRow
+	if enumerateFlags.raw {
+		// Raw ATT discovery: walk the device's own attribute database over the
+		// L2CAP ATT channel, independent of the host BlueZ version's GATT tree.
+		// This surfaces the true handles and services (e.g. GAP 0x1800) that
+		// older BlueZ hides from its D-Bus objects.
+		if err := requireRoot("enumerate --raw"); err != nil {
+			return err
+		}
+		conn, err := dialRawATT(addr)
+		if err != nil {
+			return err
+		}
+		defer conn.Close()
+		logf("raw ATT discovery (host/BlueZ-independent, true handles)")
+		rows, err = buildEnumRowsRaw(conn, enumerateFlags.readValues)
+		if err != nil {
+			return err
+		}
+	} else {
+		ctx, cancel := ctxWithRootTimeout()
+		defer cancel()
+		s, err := openSession(ctx, addr, true)
+		if err != nil {
+			return err
+		}
+		defer s.close()
+		logf("building enumeration rows (read values=%v)", enumerateFlags.readValues)
+		rows = buildEnumRows(s, enumerateFlags.readValues)
 	}
-	defer s.close()
-
-	logf("building enumeration rows (read values=%v)", enumerateFlags.readValues)
-	rows := buildEnumRows(s, enumerateFlags.readValues)
 	logf("enumerated %d characteristics", len(rows))
+	return emitEnumRows(rows)
+}
+
+// emitEnumRows renders the shared enumeration output in the selected format,
+// used by both the BlueZ D-Bus path and the raw-ATT path.
+func emitEnumRows(rows []enumRow) error {
 	if formatIsJSON() {
 		return emitJSON(rows)
 	}
@@ -216,6 +247,103 @@ func buildEnumRows(s *session, readValues bool) []enumRow {
 	return rows
 }
 
+// buildEnumRowsRaw discovers the GATT database directly over the raw ATT
+// channel (services -> characteristics -> descriptors), producing the same
+// enumRow shape as the BlueZ path but with the device's true handles and every
+// service, including GAP/GATT that some BlueZ versions omit from D-Bus.
+//
+// Values (--values) are read with a single ATT Read Request, so a value longer
+// than the (unnegotiated) 23-byte ATT MTU is truncated to the first ~22 bytes;
+// full long-value reads over raw ATT (Exchange MTU / Read Blob) are a follow-up.
+func buildEnumRowsRaw(conn *l2cap.Conn, readValues bool) ([]enumRow, error) {
+	const tmo = 5 * time.Second
+	svcs, err := conn.DiscoverPrimaryServices(tmo)
+	if err != nil {
+		return nil, fmt.Errorf("service discovery: %w", err)
+	}
+	logf("raw discovery: %d primary services", len(svcs))
+
+	var rows []enumRow
+	for _, sv := range svcs {
+		chars, err := conn.DiscoverCharacteristics(sv.StartHandle, sv.EndHandle, tmo)
+		if err != nil {
+			return rows, fmt.Errorf("characteristic discovery in %s: %w", sv.UUID, err)
+		}
+		for i, ch := range chars {
+			row := enumRow{
+				Service:       sv.UUID,
+				ServiceHandle: sv.StartHandle,
+				CharHandle:    ch.ValueHandle,
+				DeclHandle:    ch.DeclHandle,
+				CharUUID:      ch.UUID,
+				Properties:    formatProps(propsByteToFlags(ch.Properties)),
+			}
+			if readValues && ch.Properties&0x02 != 0 { // Read bit
+				logf("raw read char 0x%04x (%s)", ch.ValueHandle, ch.UUID)
+				if r, err := conn.ReadRequest(ch.ValueHandle, tmo); err == nil && r.Opcode == l2cap.OpReadResponse {
+					row.ValueHex = hex.EncodeToString(r.Body)
+					row.ValueASCII = asciiize(r.Body)
+				}
+			}
+			// Descriptors live between this char's value handle and the next
+			// char's declaration (or the end of the service for the last char).
+			descStart := ch.ValueHandle + 1
+			descEnd := sv.EndHandle
+			if i+1 < len(chars) {
+				descEnd = chars[i+1].DeclHandle - 1
+			}
+			if descStart <= descEnd {
+				ds, derr := conn.DiscoverDescriptors(descStart, descEnd, tmo)
+				if derr != nil {
+					logf("descriptor discovery 0x%04x-0x%04x: %v", descStart, descEnd, derr)
+				}
+				for _, d := range ds {
+					dr := descRow{Handle: d.Handle, UUID: d.UUID}
+					if readValues {
+						if r, err := conn.ReadRequest(d.Handle, tmo); err == nil && r.Opcode == l2cap.OpReadResponse && len(r.Body) > 0 {
+							dr.Value = hex.EncodeToString(r.Body)
+						}
+					}
+					row.DescriptorRows = append(row.DescriptorRows, dr)
+				}
+			}
+			rows = append(rows, row)
+		}
+	}
+	return rows, nil
+}
+
+// propsByteToFlags maps the ATT characteristic-properties bitfield to the same
+// flag names BlueZ uses, so formatProps renders both paths identically.
+func propsByteToFlags(p uint8) []string {
+	var f []string
+	if p&0x01 != 0 {
+		f = append(f, "broadcast")
+	}
+	if p&0x02 != 0 {
+		f = append(f, "read")
+	}
+	if p&0x04 != 0 {
+		f = append(f, "write-without-response")
+	}
+	if p&0x08 != 0 {
+		f = append(f, "write")
+	}
+	if p&0x10 != 0 {
+		f = append(f, "notify")
+	}
+	if p&0x20 != 0 {
+		f = append(f, "indicate")
+	}
+	if p&0x40 != 0 {
+		f = append(f, "authenticated-signed-writes")
+	}
+	if p&0x80 != 0 {
+		f = append(f, "extended-properties")
+	}
+	return f
+}
+
 func formatProps(flags []string) string {
 	if len(flags) == 0 {
 		return ""
@@ -241,6 +369,8 @@ func formatProps(flags []string) string {
 			short = append(short, "RW")
 		case "writable-auxiliaries":
 			short = append(short, "WA")
+		case "extended-properties":
+			short = append(short, "EX")
 		case "encrypt-read":
 			short = append(short, "ER")
 		case "encrypt-write":
@@ -257,7 +387,8 @@ func formatProps(flags []string) string {
 }
 
 // shortUUID renders adopted (SIG-base) 128-bit UUIDs in their compact 0xXXXX
-// form for display; custom/vendor UUIDs are returned unchanged. Display-only - // the JSON output keeps the full canonical UUID.
+// form for display; custom/vendor UUIDs are returned unchanged. Display-only -
+// the JSON output keeps the full canonical UUID.
 func shortUUID(u string) string {
 	if len(u) >= 8 && isSIGBaseUUID(u) {
 		return "0x" + strings.ToUpper(u[4:8])
