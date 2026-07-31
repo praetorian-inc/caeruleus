@@ -13,6 +13,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/praetorian-inc/caeruleus/internal/bluez"
+	"github.com/praetorian-inc/caeruleus/internal/l2cap"
 )
 
 var readFlags struct {
@@ -27,6 +28,7 @@ var readFlags struct {
 	every       time.Duration
 	duration    time.Duration
 	changesOnly bool
+	raw         bool
 }
 
 func newReadCmd() *cobra.Command {
@@ -52,6 +54,7 @@ Use -A for ASCII-only (one line, no key/value) or --json for machine output.`,
 	c.Flags().DurationVar(&readFlags.every, "every", 100*time.Millisecond, "watch poll interval")
 	c.Flags().DurationVar(&readFlags.duration, "duration", 0, "stop --watch after this duration (0 = until SIGINT)")
 	c.Flags().BoolVar(&readFlags.changesOnly, "changes-only", false, "during --watch, only print when the value differs from the previous read")
+	c.Flags().BoolVar(&readFlags.raw, "raw", false, "read the exact handle over raw ATT (root), bypassing BlueZ - reaches handles BlueZ doesn't expose (e.g. hidden GAP service chars on older BlueZ); pair with `enumerate --raw`")
 	return c
 }
 
@@ -73,6 +76,10 @@ func runRead(cmd *cobra.Command, args []string) error {
 
 	if readFlags.watch {
 		return runReadWatch(addr)
+	}
+
+	if readFlags.raw {
+		return runReadRaw(addr)
 	}
 
 	var obj bluez.GattObject
@@ -100,6 +107,47 @@ func runRead(cmd *cobra.Command, args []string) error {
 	}
 
 	emitRead(obj.Handle, obj.UUID, val)
+	return nil
+}
+
+// runReadRaw reads the exact ATT handle over the raw L2CAP channel, bypassing
+// BlueZ's GATT tree. This reaches handles BlueZ doesn't expose as D-Bus objects,
+// notably characteristics in services older BlueZ hides (e.g. GAP 0x1800), which
+// enumerate --raw surfaces. It sends a single ATT Read Request, so a value longer
+// than the (unnegotiated) ATT MTU truncates to the first ~22 bytes.
+func runReadRaw(addr string) error {
+	if readFlags.handle == "" {
+		return fmt.Errorf("read --raw reads by handle: supply -a/--handle (a true handle from `enumerate --raw`)")
+	}
+	if err := requireRoot("read --raw"); err != nil {
+		return err
+	}
+	h, err := parseHandle(readFlags.handle)
+	if err != nil {
+		return err
+	}
+	conn, err := dialRawATT(addr)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+
+	var val []byte
+	if err := retryable(readFlags.retry, readFlags.retryDelay, func() error {
+		r, err := conn.ReadRequest(h, 5*time.Second)
+		if err != nil {
+			return err
+		}
+		if r.Opcode == l2cap.OpErrorResponse {
+			return fmt.Errorf("ATT Error Response: handle 0x%04x code 0x%02x (%s)",
+				h, r.ErrCode, l2cap.AttErrorString(r.ErrCode))
+		}
+		val = r.Body
+		return nil
+	}); err != nil {
+		return err
+	}
+	emitRead(h, "", val)
 	return nil
 }
 
@@ -225,7 +273,7 @@ func resolveChar(s *session, handle, uuid string) (bluez.GattObject, error) {
 		}
 		obj, ok := s.tree.ByHandle[h]
 		if !ok {
-			return bluez.GattObject{}, fmt.Errorf("no characteristic/descriptor at handle 0x%04x", h)
+			return bluez.GattObject{}, fmt.Errorf("no characteristic/descriptor at handle 0x%04x (if `enumerate --raw` shows it but this doesn't, BlueZ isn't exposing it; try `read --raw -a 0x%04x`)", h, h)
 		}
 		return obj, nil
 	}
