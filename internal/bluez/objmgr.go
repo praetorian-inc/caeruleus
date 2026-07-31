@@ -193,7 +193,15 @@ func handleFromPath(p dbus.ObjectPath) uint16 {
 			if err != nil {
 				return 0
 			}
-			return uint16(n)
+			h := uint16(n)
+			// BlueZ names the characteristic object-path segment with the
+			// DECLARATION handle; the value handle callers read/write is the
+			// next one. BlueZ >= 5.57 exposes the value handle via the Handle
+			// property, so this fallback must match it (and enumerate --raw).
+			if pfx == "char" {
+				h++
+			}
+			return h
 		}
 	}
 	return 0
