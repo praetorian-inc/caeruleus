@@ -91,6 +91,7 @@ caeruleus assess check-auth -b $A -o json | jq '.findings[] | select(.severity==
 
 ## Good to know
 
+- **Missing services / wrong handles on older BlueZ?** BlueZ around 5.55 hides the remote GAP (0x1800) / GATT services from its GATT tree, so `enumerate` can miss characteristics (e.g. Device Name) and show handles offset from the device's true ATT handles. `sudo caeruleus enumerate -b <mac> --raw` walks the database directly over ATT for a complete, host-independent view with the device's true handles.
 - **Connect fails?** Pass `--addr-type random` (or `public`). `scan` shows each device's type.
 - **One central at a time:** most peripherals accept a single connection. The tool disconnects on exit; for many back-to-back ops, hold one warm link with `caeruleus serve -b <mac>` + `caeruleus send "read 0x0013"`.
 - **Root:** only `conn-params`, `monitor`, `fuzz write --raw`, `cccd --raw`, `raw-write`, `mtu --set`, and `bdaddr --set` need `sudo`.
