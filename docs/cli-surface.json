@@ -1,0 +1,3374 @@
+{
+  "schemaVersion": 1,
+  "surfaceHash": "sha256:faead0c7394443492ffb96450fc3b2579e7b654de2433c4b2d2125d40d645d2b",
+  "commands": [
+    {
+      "path": "caeruleus",
+      "use": "caeruleus",
+      "short": "BLE GATT toolkit (gatttool/gratttool-style, written in Go)",
+      "runnable": false,
+      "flags": [
+        {
+          "name": "adapter",
+          "shorthand": "i",
+          "type": "string",
+          "default": "hci0",
+          "usage": "HCI adapter name (e.g. hci0)"
+        },
+        {
+          "name": "addr-type",
+          "type": "string",
+          "usage": "address type: public | random (auto if blank)"
+        },
+        {
+          "name": "bdaddr",
+          "shorthand": "b",
+          "type": "string",
+          "usage": "remote BD_ADDR (XX:XX:XX:XX:XX:XX)"
+        },
+        {
+          "name": "format",
+          "shorthand": "o",
+          "type": "string",
+          "default": "text",
+          "usage": "output format: text | json | jsonl (json/jsonl output is authoritative; do not re-run in text mode)"
+        },
+        {
+          "name": "json",
+          "type": "bool",
+          "default": "false",
+          "usage": "deprecated alias for --format jsonl",
+          "hidden": true
+        },
+        {
+          "name": "quiet",
+          "shorthand": "q",
+          "type": "bool",
+          "default": "false",
+          "usage": "suppress informational status lines on stderr (data + errors still emitted)"
+        },
+        {
+          "name": "timeout",
+          "shorthand": "t",
+          "type": "int",
+          "default": "45",
+          "usage": "operation timeout, seconds"
+        },
+        {
+          "name": "verbose",
+          "shorthand": "v",
+          "type": "bool",
+          "default": "false",
+          "usage": "verbose diagnostic logging on stderr"
+        }
+      ]
+    },
+    {
+      "path": "caeruleus adapter",
+      "use": "adapter",
+      "short": "Inspect or recover the local HCI adapter",
+      "runnable": false,
+      "flags": [
+        {
+          "name": "adapter",
+          "shorthand": "i",
+          "type": "string",
+          "default": "hci0",
+          "usage": "HCI adapter name (e.g. hci0)",
+          "inherited": true
+        },
+        {
+          "name": "addr-type",
+          "type": "string",
+          "usage": "address type: public | random (auto if blank)",
+          "inherited": true
+        },
+        {
+          "name": "bdaddr",
+          "shorthand": "b",
+          "type": "string",
+          "usage": "remote BD_ADDR (XX:XX:XX:XX:XX:XX)",
+          "inherited": true
+        },
+        {
+          "name": "format",
+          "shorthand": "o",
+          "type": "string",
+          "default": "text",
+          "usage": "output format: text | json | jsonl (json/jsonl output is authoritative; do not re-run in text mode)",
+          "inherited": true
+        },
+        {
+          "name": "json",
+          "type": "bool",
+          "default": "false",
+          "usage": "deprecated alias for --format jsonl",
+          "inherited": true,
+          "hidden": true
+        },
+        {
+          "name": "quiet",
+          "shorthand": "q",
+          "type": "bool",
+          "default": "false",
+          "usage": "suppress informational status lines on stderr (data + errors still emitted)",
+          "inherited": true
+        },
+        {
+          "name": "timeout",
+          "shorthand": "t",
+          "type": "int",
+          "default": "45",
+          "usage": "operation timeout, seconds",
+          "inherited": true
+        },
+        {
+          "name": "verbose",
+          "shorthand": "v",
+          "type": "bool",
+          "default": "false",
+          "usage": "verbose diagnostic logging on stderr",
+          "inherited": true
+        }
+      ]
+    },
+    {
+      "path": "caeruleus adapter info",
+      "use": "info",
+      "short": "Print adapter info as a single key=value line (--verbose for the multi-line form)",
+      "runnable": true,
+      "flags": [
+        {
+          "name": "adapter",
+          "shorthand": "i",
+          "type": "string",
+          "default": "hci0",
+          "usage": "HCI adapter name (e.g. hci0)",
+          "inherited": true
+        },
+        {
+          "name": "addr-type",
+          "type": "string",
+          "usage": "address type: public | random (auto if blank)",
+          "inherited": true
+        },
+        {
+          "name": "bdaddr",
+          "shorthand": "b",
+          "type": "string",
+          "usage": "remote BD_ADDR (XX:XX:XX:XX:XX:XX)",
+          "inherited": true
+        },
+        {
+          "name": "format",
+          "shorthand": "o",
+          "type": "string",
+          "default": "text",
+          "usage": "output format: text | json | jsonl (json/jsonl output is authoritative; do not re-run in text mode)",
+          "inherited": true
+        },
+        {
+          "name": "json",
+          "type": "bool",
+          "default": "false",
+          "usage": "deprecated alias for --format jsonl",
+          "inherited": true,
+          "hidden": true
+        },
+        {
+          "name": "quiet",
+          "shorthand": "q",
+          "type": "bool",
+          "default": "false",
+          "usage": "suppress informational status lines on stderr (data + errors still emitted)",
+          "inherited": true
+        },
+        {
+          "name": "timeout",
+          "shorthand": "t",
+          "type": "int",
+          "default": "45",
+          "usage": "operation timeout, seconds",
+          "inherited": true
+        },
+        {
+          "name": "verbose",
+          "type": "bool",
+          "default": "false",
+          "usage": "print one labelled line per field (slower to scan, easier to read)"
+        }
+      ]
+    },
+    {
+      "path": "caeruleus adapter power",
+      "use": "power [on|off|cycle]",
+      "short": "Toggle Adapter1.Powered (the equivalent of bluetoothctl 'power on/off')",
+      "runnable": true,
+      "flags": [
+        {
+          "name": "adapter",
+          "shorthand": "i",
+          "type": "string",
+          "default": "hci0",
+          "usage": "HCI adapter name (e.g. hci0)",
+          "inherited": true
+        },
+        {
+          "name": "addr-type",
+          "type": "string",
+          "usage": "address type: public | random (auto if blank)",
+          "inherited": true
+        },
+        {
+          "name": "bdaddr",
+          "shorthand": "b",
+          "type": "string",
+          "usage": "remote BD_ADDR (XX:XX:XX:XX:XX:XX)",
+          "inherited": true
+        },
+        {
+          "name": "format",
+          "shorthand": "o",
+          "type": "string",
+          "default": "text",
+          "usage": "output format: text | json | jsonl (json/jsonl output is authoritative; do not re-run in text mode)",
+          "inherited": true
+        },
+        {
+          "name": "json",
+          "type": "bool",
+          "default": "false",
+          "usage": "deprecated alias for --format jsonl",
+          "inherited": true,
+          "hidden": true
+        },
+        {
+          "name": "quiet",
+          "shorthand": "q",
+          "type": "bool",
+          "default": "false",
+          "usage": "suppress informational status lines on stderr (data + errors still emitted)",
+          "inherited": true
+        },
+        {
+          "name": "timeout",
+          "shorthand": "t",
+          "type": "int",
+          "default": "45",
+          "usage": "operation timeout, seconds",
+          "inherited": true
+        },
+        {
+          "name": "verbose",
+          "shorthand": "v",
+          "type": "bool",
+          "default": "false",
+          "usage": "verbose diagnostic logging on stderr",
+          "inherited": true
+        }
+      ]
+    },
+    {
+      "path": "caeruleus assess",
+      "use": "assess",
+      "short": "Active security tests: auth, encryption, pairing, write-without-response, DFU",
+      "runnable": false,
+      "flags": [
+        {
+          "name": "adapter",
+          "shorthand": "i",
+          "type": "string",
+          "default": "hci0",
+          "usage": "HCI adapter name (e.g. hci0)",
+          "inherited": true
+        },
+        {
+          "name": "addr-type",
+          "type": "string",
+          "usage": "address type: public | random (auto if blank)",
+          "inherited": true
+        },
+        {
+          "name": "bdaddr",
+          "shorthand": "b",
+          "type": "string",
+          "usage": "remote BD_ADDR (XX:XX:XX:XX:XX:XX)",
+          "inherited": true
+        },
+        {
+          "name": "format",
+          "shorthand": "o",
+          "type": "string",
+          "default": "text",
+          "usage": "output format: text | json | jsonl (json/jsonl output is authoritative; do not re-run in text mode)",
+          "inherited": true
+        },
+        {
+          "name": "json",
+          "type": "bool",
+          "default": "false",
+          "usage": "deprecated alias for --format jsonl",
+          "inherited": true,
+          "hidden": true
+        },
+        {
+          "name": "quiet",
+          "shorthand": "q",
+          "type": "bool",
+          "default": "false",
+          "usage": "suppress informational status lines on stderr (data + errors still emitted)",
+          "inherited": true
+        },
+        {
+          "name": "timeout",
+          "shorthand": "t",
+          "type": "int",
+          "default": "45",
+          "usage": "operation timeout, seconds",
+          "inherited": true
+        },
+        {
+          "name": "verbose",
+          "shorthand": "v",
+          "type": "bool",
+          "default": "false",
+          "usage": "verbose diagnostic logging on stderr",
+          "inherited": true
+        }
+      ]
+    },
+    {
+      "path": "caeruleus assess check-auth",
+      "use": "check-auth",
+      "short": "Read-only by default: what an unpaired attacker can read on -b BDADDR (add --probe-write for write checks)",
+      "aliases": [
+        "auth-bypass"
+      ],
+      "runnable": true,
+      "flags": [
+        {
+          "name": "adapter",
+          "shorthand": "i",
+          "type": "string",
+          "default": "hci0",
+          "usage": "HCI adapter name (e.g. hci0)",
+          "inherited": true
+        },
+        {
+          "name": "addr-type",
+          "type": "string",
+          "usage": "address type: public | random (auto if blank)",
+          "inherited": true
+        },
+        {
+          "name": "bdaddr",
+          "shorthand": "b",
+          "type": "string",
+          "usage": "remote BD_ADDR (XX:XX:XX:XX:XX:XX)",
+          "inherited": true
+        },
+        {
+          "name": "format",
+          "shorthand": "o",
+          "type": "string",
+          "default": "text",
+          "usage": "output format: text | json | jsonl (json/jsonl output is authoritative; do not re-run in text mode)",
+          "inherited": true
+        },
+        {
+          "name": "json",
+          "type": "bool",
+          "default": "false",
+          "usage": "deprecated alias for --format jsonl",
+          "inherited": true,
+          "hidden": true
+        },
+        {
+          "name": "probe-write",
+          "type": "bool",
+          "default": "false",
+          "usage": "also test writes by writing each readable value back to itself (opt-in; exercises the write path)"
+        },
+        {
+          "name": "quiet",
+          "shorthand": "q",
+          "type": "bool",
+          "default": "false",
+          "usage": "suppress informational status lines on stderr (data + errors still emitted)",
+          "inherited": true
+        },
+        {
+          "name": "timeout",
+          "shorthand": "t",
+          "type": "int",
+          "default": "45",
+          "usage": "operation timeout, seconds",
+          "inherited": true
+        },
+        {
+          "name": "verbose",
+          "shorthand": "v",
+          "type": "bool",
+          "default": "false",
+          "usage": "verbose diagnostic logging on stderr",
+          "inherited": true
+        }
+      ]
+    },
+    {
+      "path": "caeruleus assess dfu",
+      "use": "dfu",
+      "short": "Detect a DFU service on -b BDADDR and whether entry is unauthenticated",
+      "runnable": true,
+      "flags": [
+        {
+          "name": "adapter",
+          "shorthand": "i",
+          "type": "string",
+          "default": "hci0",
+          "usage": "HCI adapter name (e.g. hci0)",
+          "inherited": true
+        },
+        {
+          "name": "addr-type",
+          "type": "string",
+          "usage": "address type: public | random (auto if blank)",
+          "inherited": true
+        },
+        {
+          "name": "bdaddr",
+          "shorthand": "b",
+          "type": "string",
+          "usage": "remote BD_ADDR (XX:XX:XX:XX:XX:XX)",
+          "inherited": true
+        },
+        {
+          "name": "format",
+          "shorthand": "o",
+          "type": "string",
+          "default": "text",
+          "usage": "output format: text | json | jsonl (json/jsonl output is authoritative; do not re-run in text mode)",
+          "inherited": true
+        },
+        {
+          "name": "json",
+          "type": "bool",
+          "default": "false",
+          "usage": "deprecated alias for --format jsonl",
+          "inherited": true,
+          "hidden": true
+        },
+        {
+          "name": "probe-entry",
+          "type": "bool",
+          "default": "false",
+          "usage": "actually write the buttonless enter-DFU opcode (DESTRUCTIVE: reboots the device)"
+        },
+        {
+          "name": "quiet",
+          "shorthand": "q",
+          "type": "bool",
+          "default": "false",
+          "usage": "suppress informational status lines on stderr (data + errors still emitted)",
+          "inherited": true
+        },
+        {
+          "name": "timeout",
+          "shorthand": "t",
+          "type": "int",
+          "default": "45",
+          "usage": "operation timeout, seconds",
+          "inherited": true
+        },
+        {
+          "name": "verbose",
+          "shorthand": "v",
+          "type": "bool",
+          "default": "false",
+          "usage": "verbose diagnostic logging on stderr",
+          "inherited": true
+        },
+        {
+          "name": "yes",
+          "shorthand": "y",
+          "type": "bool",
+          "default": "false",
+          "usage": "skip the confirmation prompt for --probe-entry"
+        }
+      ]
+    },
+    {
+      "path": "caeruleus assess encryption",
+      "use": "encryption",
+      "short": "Whether pairing changes what -b BDADDR exposes (enforcement / fallback)",
+      "runnable": true,
+      "flags": [
+        {
+          "name": "adapter",
+          "shorthand": "i",
+          "type": "string",
+          "default": "hci0",
+          "usage": "HCI adapter name (e.g. hci0)",
+          "inherited": true
+        },
+        {
+          "name": "addr-type",
+          "type": "string",
+          "usage": "address type: public | random (auto if blank)",
+          "inherited": true
+        },
+        {
+          "name": "bdaddr",
+          "shorthand": "b",
+          "type": "string",
+          "usage": "remote BD_ADDR (XX:XX:XX:XX:XX:XX)",
+          "inherited": true
+        },
+        {
+          "name": "format",
+          "shorthand": "o",
+          "type": "string",
+          "default": "text",
+          "usage": "output format: text | json | jsonl (json/jsonl output is authoritative; do not re-run in text mode)",
+          "inherited": true
+        },
+        {
+          "name": "json",
+          "type": "bool",
+          "default": "false",
+          "usage": "deprecated alias for --format jsonl",
+          "inherited": true,
+          "hidden": true
+        },
+        {
+          "name": "quiet",
+          "shorthand": "q",
+          "type": "bool",
+          "default": "false",
+          "usage": "suppress informational status lines on stderr (data + errors still emitted)",
+          "inherited": true
+        },
+        {
+          "name": "timeout",
+          "shorthand": "t",
+          "type": "int",
+          "default": "45",
+          "usage": "operation timeout, seconds",
+          "inherited": true
+        },
+        {
+          "name": "verbose",
+          "shorthand": "v",
+          "type": "bool",
+          "default": "false",
+          "usage": "verbose diagnostic logging on stderr",
+          "inherited": true
+        }
+      ]
+    },
+    {
+      "path": "caeruleus assess pairing",
+      "use": "pairing",
+      "short": "Probe the SMP pairing feature exchange + downgrade resistance (root; takes over the adapter)",
+      "runnable": true,
+      "flags": [
+        {
+          "name": "adapter",
+          "shorthand": "i",
+          "type": "string",
+          "default": "hci0",
+          "usage": "HCI adapter name (e.g. hci0)",
+          "inherited": true
+        },
+        {
+          "name": "addr-type",
+          "type": "string",
+          "usage": "address type: public | random (auto if blank)",
+          "inherited": true
+        },
+        {
+          "name": "bdaddr",
+          "shorthand": "b",
+          "type": "string",
+          "usage": "remote BD_ADDR (XX:XX:XX:XX:XX:XX)",
+          "inherited": true
+        },
+        {
+          "name": "format",
+          "shorthand": "o",
+          "type": "string",
+          "default": "text",
+          "usage": "output format: text | json | jsonl (json/jsonl output is authoritative; do not re-run in text mode)",
+          "inherited": true
+        },
+        {
+          "name": "json",
+          "type": "bool",
+          "default": "false",
+          "usage": "deprecated alias for --format jsonl",
+          "inherited": true,
+          "hidden": true
+        },
+        {
+          "name": "quiet",
+          "shorthand": "q",
+          "type": "bool",
+          "default": "false",
+          "usage": "suppress informational status lines on stderr (data + errors still emitted)",
+          "inherited": true
+        },
+        {
+          "name": "timeout",
+          "shorthand": "t",
+          "type": "int",
+          "default": "45",
+          "usage": "operation timeout, seconds",
+          "inherited": true
+        },
+        {
+          "name": "verbose",
+          "shorthand": "v",
+          "type": "bool",
+          "default": "false",
+          "usage": "verbose diagnostic logging on stderr",
+          "inherited": true
+        }
+      ]
+    },
+    {
+      "path": "caeruleus assess wwr",
+      "use": "wwr",
+      "short": "Write-without-response overflow + rapid-fire resilience on -b BDADDR",
+      "runnable": true,
+      "flags": [
+        {
+          "name": "adapter",
+          "shorthand": "i",
+          "type": "string",
+          "default": "hci0",
+          "usage": "HCI adapter name (e.g. hci0)",
+          "inherited": true
+        },
+        {
+          "name": "addr-type",
+          "type": "string",
+          "usage": "address type: public | random (auto if blank)",
+          "inherited": true
+        },
+        {
+          "name": "bdaddr",
+          "shorthand": "b",
+          "type": "string",
+          "usage": "remote BD_ADDR (XX:XX:XX:XX:XX:XX)",
+          "inherited": true
+        },
+        {
+          "name": "burst",
+          "type": "int",
+          "default": "100",
+          "usage": "number of rapid-fire writes for the exhaustion test"
+        },
+        {
+          "name": "format",
+          "shorthand": "o",
+          "type": "string",
+          "default": "text",
+          "usage": "output format: text | json | jsonl (json/jsonl output is authoritative; do not re-run in text mode)",
+          "inherited": true
+        },
+        {
+          "name": "json",
+          "type": "bool",
+          "default": "false",
+          "usage": "deprecated alias for --format jsonl",
+          "inherited": true,
+          "hidden": true
+        },
+        {
+          "name": "quiet",
+          "shorthand": "q",
+          "type": "bool",
+          "default": "false",
+          "usage": "suppress informational status lines on stderr (data + errors still emitted)",
+          "inherited": true
+        },
+        {
+          "name": "sizes",
+          "type": "intSlice",
+          "default": "[20,50,100,200,512]",
+          "usage": "payload sizes (bytes) for the overflow sweep"
+        },
+        {
+          "name": "timeout",
+          "shorthand": "t",
+          "type": "int",
+          "default": "45",
+          "usage": "operation timeout, seconds",
+          "inherited": true
+        },
+        {
+          "name": "verbose",
+          "shorthand": "v",
+          "type": "bool",
+          "default": "false",
+          "usage": "verbose diagnostic logging on stderr",
+          "inherited": true
+        }
+      ]
+    },
+    {
+      "path": "caeruleus batch",
+      "use": "batch",
+      "short": "Run shell commands from stdin against a single persistent connection",
+      "runnable": true,
+      "flags": [
+        {
+          "name": "adapter",
+          "shorthand": "i",
+          "type": "string",
+          "default": "hci0",
+          "usage": "HCI adapter name (e.g. hci0)",
+          "inherited": true
+        },
+        {
+          "name": "addr-type",
+          "type": "string",
+          "usage": "address type: public | random (auto if blank)",
+          "inherited": true
+        },
+        {
+          "name": "bdaddr",
+          "shorthand": "b",
+          "type": "string",
+          "usage": "remote BD_ADDR (XX:XX:XX:XX:XX:XX)",
+          "inherited": true
+        },
+        {
+          "name": "format",
+          "shorthand": "o",
+          "type": "string",
+          "default": "text",
+          "usage": "output format: text | json | jsonl (json/jsonl output is authoritative; do not re-run in text mode)",
+          "inherited": true
+        },
+        {
+          "name": "json",
+          "type": "bool",
+          "default": "false",
+          "usage": "deprecated alias for --format jsonl",
+          "inherited": true,
+          "hidden": true
+        },
+        {
+          "name": "quiet",
+          "shorthand": "q",
+          "type": "bool",
+          "default": "false",
+          "usage": "suppress informational status lines on stderr (data + errors still emitted)",
+          "inherited": true
+        },
+        {
+          "name": "timeout",
+          "shorthand": "t",
+          "type": "int",
+          "default": "45",
+          "usage": "operation timeout, seconds",
+          "inherited": true
+        },
+        {
+          "name": "verbose",
+          "shorthand": "v",
+          "type": "bool",
+          "default": "false",
+          "usage": "verbose diagnostic logging on stderr",
+          "inherited": true
+        }
+      ]
+    },
+    {
+      "path": "caeruleus bdaddr",
+      "use": "bdaddr",
+      "short": "Read or spoof the adapter's BD_ADDR (needs root; vendor-specific)",
+      "runnable": true,
+      "flags": [
+        {
+          "name": "adapter",
+          "shorthand": "i",
+          "type": "string",
+          "default": "hci0",
+          "usage": "HCI adapter name (e.g. hci0)",
+          "inherited": true
+        },
+        {
+          "name": "addr-type",
+          "type": "string",
+          "usage": "address type: public | random (auto if blank)",
+          "inherited": true
+        },
+        {
+          "name": "bdaddr",
+          "shorthand": "b",
+          "type": "string",
+          "usage": "remote BD_ADDR (XX:XX:XX:XX:XX:XX)",
+          "inherited": true
+        },
+        {
+          "name": "format",
+          "shorthand": "o",
+          "type": "string",
+          "default": "text",
+          "usage": "output format: text | json | jsonl (json/jsonl output is authoritative; do not re-run in text mode)",
+          "inherited": true
+        },
+        {
+          "name": "json",
+          "type": "bool",
+          "default": "false",
+          "usage": "deprecated alias for --format jsonl",
+          "inherited": true,
+          "hidden": true
+        },
+        {
+          "name": "list-vendors",
+          "type": "bool",
+          "default": "false",
+          "usage": "list known vendor command tables and exit"
+        },
+        {
+          "name": "no-apply",
+          "type": "bool",
+          "default": "false",
+          "usage": "no-op; the apply step is off by default now",
+          "hidden": true
+        },
+        {
+          "name": "no-reset",
+          "type": "bool",
+          "default": "false",
+          "usage": "deprecated alias for --no-apply (no-op)",
+          "hidden": true
+        },
+        {
+          "name": "quiet",
+          "shorthand": "q",
+          "type": "bool",
+          "default": "false",
+          "usage": "suppress informational status lines on stderr (data + errors still emitted)",
+          "inherited": true
+        },
+        {
+          "name": "refresh-bluez",
+          "type": "bool",
+          "default": "false",
+          "usage": "LAST RESORT only - use plain --set first. Runs HCIDEVRESET after the vendor write; on some chips (notably Intel AX) this also reloads OTP and silently reverts the spoof, and can leave the controller stuck in BR/EDR INQUIRY mode. Reach for this only when plain --set leaves bluetoothd reporting the old addr."
+        },
+        {
+          "name": "set",
+          "type": "string",
+          "usage": "rewrite the adapter BD_ADDR to this MAC"
+        },
+        {
+          "name": "show",
+          "type": "bool",
+          "default": "false",
+          "usage": "read and print the current adapter BD_ADDR + manufacturer"
+        },
+        {
+          "name": "timeout",
+          "shorthand": "t",
+          "type": "int",
+          "default": "45",
+          "usage": "operation timeout, seconds",
+          "inherited": true
+        },
+        {
+          "name": "transient",
+          "type": "bool",
+          "default": "false",
+          "usage": "do not persist the change (informational only - kernel decides)"
+        },
+        {
+          "name": "vendor",
+          "type": "string",
+          "usage": "force a specific vendor command (csr|broadcom|ti|intel|zeevo|st|cypress|ericsson)"
+        },
+        {
+          "name": "verbose",
+          "shorthand": "v",
+          "type": "bool",
+          "default": "false",
+          "usage": "verbose diagnostic logging on stderr",
+          "inherited": true
+        }
+      ]
+    },
+    {
+      "path": "caeruleus cccd",
+      "use": "cccd",
+      "short": "Manipulate a Client Characteristic Configuration Descriptor",
+      "runnable": false,
+      "flags": [
+        {
+          "name": "adapter",
+          "shorthand": "i",
+          "type": "string",
+          "default": "hci0",
+          "usage": "HCI adapter name (e.g. hci0)",
+          "inherited": true
+        },
+        {
+          "name": "addr-type",
+          "type": "string",
+          "usage": "address type: public | random (auto if blank)",
+          "inherited": true
+        },
+        {
+          "name": "bdaddr",
+          "shorthand": "b",
+          "type": "string",
+          "usage": "remote BD_ADDR (XX:XX:XX:XX:XX:XX)",
+          "inherited": true
+        },
+        {
+          "name": "format",
+          "shorthand": "o",
+          "type": "string",
+          "default": "text",
+          "usage": "output format: text | json | jsonl (json/jsonl output is authoritative; do not re-run in text mode)",
+          "inherited": true
+        },
+        {
+          "name": "json",
+          "type": "bool",
+          "default": "false",
+          "usage": "deprecated alias for --format jsonl",
+          "inherited": true,
+          "hidden": true
+        },
+        {
+          "name": "quiet",
+          "shorthand": "q",
+          "type": "bool",
+          "default": "false",
+          "usage": "suppress informational status lines on stderr (data + errors still emitted)",
+          "inherited": true
+        },
+        {
+          "name": "timeout",
+          "shorthand": "t",
+          "type": "int",
+          "default": "45",
+          "usage": "operation timeout, seconds",
+          "inherited": true
+        },
+        {
+          "name": "verbose",
+          "shorthand": "v",
+          "type": "bool",
+          "default": "false",
+          "usage": "verbose diagnostic logging on stderr",
+          "inherited": true
+        }
+      ]
+    },
+    {
+      "path": "caeruleus cccd write",
+      "use": "write",
+      "short": "Write a 2-byte CCCD value via BlueZ (or raw L2CAP if --raw)",
+      "runnable": true,
+      "flags": [
+        {
+          "name": "adapter",
+          "shorthand": "i",
+          "type": "string",
+          "default": "hci0",
+          "usage": "HCI adapter name (e.g. hci0)",
+          "inherited": true
+        },
+        {
+          "name": "addr-type",
+          "type": "string",
+          "usage": "address type: public | random (auto if blank)",
+          "inherited": true
+        },
+        {
+          "name": "bdaddr",
+          "shorthand": "b",
+          "type": "string",
+          "usage": "remote BD_ADDR (XX:XX:XX:XX:XX:XX)",
+          "inherited": true
+        },
+        {
+          "name": "char",
+          "type": "string",
+          "usage": "characteristic value handle; CCCD is auto-located on that char"
+        },
+        {
+          "name": "enable",
+          "type": "string",
+          "usage": "notify | indicate | off"
+        },
+        {
+          "name": "format",
+          "shorthand": "o",
+          "type": "string",
+          "default": "text",
+          "usage": "output format: text | json | jsonl (json/jsonl output is authoritative; do not re-run in text mode)",
+          "inherited": true
+        },
+        {
+          "name": "handle",
+          "type": "string",
+          "usage": "explicit descriptor handle to write to (skips auto-discovery)"
+        },
+        {
+          "name": "json",
+          "type": "bool",
+          "default": "false",
+          "usage": "deprecated alias for --format jsonl",
+          "inherited": true,
+          "hidden": true
+        },
+        {
+          "name": "quiet",
+          "shorthand": "q",
+          "type": "bool",
+          "default": "false",
+          "usage": "suppress informational status lines on stderr (data + errors still emitted)",
+          "inherited": true
+        },
+        {
+          "name": "raw",
+          "type": "bool",
+          "default": "false",
+          "usage": "use raw L2CAP ATT path (Layer B - requires root and --handle)"
+        },
+        {
+          "name": "timeout",
+          "shorthand": "t",
+          "type": "int",
+          "default": "45",
+          "usage": "operation timeout, seconds",
+          "inherited": true
+        },
+        {
+          "name": "value",
+          "type": "string",
+          "usage": "explicit 2-byte hex value (overrides --enable)"
+        },
+        {
+          "name": "verbose",
+          "shorthand": "v",
+          "type": "bool",
+          "default": "false",
+          "usage": "verbose diagnostic logging on stderr",
+          "inherited": true
+        }
+      ]
+    },
+    {
+      "path": "caeruleus characteristics",
+      "use": "characteristics",
+      "short": "List characteristics (gatttool --characteristics)",
+      "aliases": [
+        "chars"
+      ],
+      "runnable": true,
+      "flags": [
+        {
+          "name": "adapter",
+          "shorthand": "i",
+          "type": "string",
+          "default": "hci0",
+          "usage": "HCI adapter name (e.g. hci0)",
+          "inherited": true
+        },
+        {
+          "name": "addr-type",
+          "type": "string",
+          "usage": "address type: public | random (auto if blank)",
+          "inherited": true
+        },
+        {
+          "name": "bdaddr",
+          "shorthand": "b",
+          "type": "string",
+          "usage": "remote BD_ADDR (XX:XX:XX:XX:XX:XX)",
+          "inherited": true
+        },
+        {
+          "name": "format",
+          "shorthand": "o",
+          "type": "string",
+          "default": "text",
+          "usage": "output format: text | json | jsonl (json/jsonl output is authoritative; do not re-run in text mode)",
+          "inherited": true
+        },
+        {
+          "name": "json",
+          "type": "bool",
+          "default": "false",
+          "usage": "deprecated alias for --format jsonl",
+          "inherited": true,
+          "hidden": true
+        },
+        {
+          "name": "quiet",
+          "shorthand": "q",
+          "type": "bool",
+          "default": "false",
+          "usage": "suppress informational status lines on stderr (data + errors still emitted)",
+          "inherited": true
+        },
+        {
+          "name": "timeout",
+          "shorthand": "t",
+          "type": "int",
+          "default": "45",
+          "usage": "operation timeout, seconds",
+          "inherited": true
+        },
+        {
+          "name": "verbose",
+          "shorthand": "v",
+          "type": "bool",
+          "default": "false",
+          "usage": "verbose diagnostic logging on stderr",
+          "inherited": true
+        }
+      ]
+    },
+    {
+      "path": "caeruleus completion",
+      "use": "completion [bash|zsh|fish|powershell]",
+      "short": "Generate a shell completion script",
+      "runnable": true,
+      "flags": [
+        {
+          "name": "adapter",
+          "shorthand": "i",
+          "type": "string",
+          "default": "hci0",
+          "usage": "HCI adapter name (e.g. hci0)",
+          "inherited": true
+        },
+        {
+          "name": "addr-type",
+          "type": "string",
+          "usage": "address type: public | random (auto if blank)",
+          "inherited": true
+        },
+        {
+          "name": "bdaddr",
+          "shorthand": "b",
+          "type": "string",
+          "usage": "remote BD_ADDR (XX:XX:XX:XX:XX:XX)",
+          "inherited": true
+        },
+        {
+          "name": "format",
+          "shorthand": "o",
+          "type": "string",
+          "default": "text",
+          "usage": "output format: text | json | jsonl (json/jsonl output is authoritative; do not re-run in text mode)",
+          "inherited": true
+        },
+        {
+          "name": "json",
+          "type": "bool",
+          "default": "false",
+          "usage": "deprecated alias for --format jsonl",
+          "inherited": true,
+          "hidden": true
+        },
+        {
+          "name": "quiet",
+          "shorthand": "q",
+          "type": "bool",
+          "default": "false",
+          "usage": "suppress informational status lines on stderr (data + errors still emitted)",
+          "inherited": true
+        },
+        {
+          "name": "timeout",
+          "shorthand": "t",
+          "type": "int",
+          "default": "45",
+          "usage": "operation timeout, seconds",
+          "inherited": true
+        },
+        {
+          "name": "verbose",
+          "shorthand": "v",
+          "type": "bool",
+          "default": "false",
+          "usage": "verbose diagnostic logging on stderr",
+          "inherited": true
+        }
+      ]
+    },
+    {
+      "path": "caeruleus conn-params",
+      "use": "conn-params",
+      "short": "Report the negotiated connection parameters for -b BDADDR (needs root)",
+      "aliases": [
+        "connparams",
+        "cparams"
+      ],
+      "runnable": true,
+      "flags": [
+        {
+          "name": "adapter",
+          "shorthand": "i",
+          "type": "string",
+          "default": "hci0",
+          "usage": "HCI adapter name (e.g. hci0)",
+          "inherited": true
+        },
+        {
+          "name": "addr-type",
+          "type": "string",
+          "usage": "address type: public | random (auto if blank)",
+          "inherited": true
+        },
+        {
+          "name": "bdaddr",
+          "shorthand": "b",
+          "type": "string",
+          "usage": "remote BD_ADDR (XX:XX:XX:XX:XX:XX)",
+          "inherited": true
+        },
+        {
+          "name": "format",
+          "shorthand": "o",
+          "type": "string",
+          "default": "text",
+          "usage": "output format: text | json | jsonl (json/jsonl output is authoritative; do not re-run in text mode)",
+          "inherited": true
+        },
+        {
+          "name": "json",
+          "type": "bool",
+          "default": "false",
+          "usage": "deprecated alias for --format jsonl",
+          "inherited": true,
+          "hidden": true
+        },
+        {
+          "name": "quiet",
+          "shorthand": "q",
+          "type": "bool",
+          "default": "false",
+          "usage": "suppress informational status lines on stderr (data + errors still emitted)",
+          "inherited": true
+        },
+        {
+          "name": "timeout",
+          "shorthand": "t",
+          "type": "int",
+          "default": "45",
+          "usage": "operation timeout, seconds",
+          "inherited": true
+        },
+        {
+          "name": "verbose",
+          "shorthand": "v",
+          "type": "bool",
+          "default": "false",
+          "usage": "verbose diagnostic logging on stderr",
+          "inherited": true
+        }
+      ]
+    },
+    {
+      "path": "caeruleus disconnect",
+      "use": "disconnect",
+      "short": "Disconnect a peripheral and wait for Connected=false",
+      "aliases": [
+        "dc"
+      ],
+      "runnable": true,
+      "flags": [
+        {
+          "name": "adapter",
+          "shorthand": "i",
+          "type": "string",
+          "default": "hci0",
+          "usage": "HCI adapter name (e.g. hci0)",
+          "inherited": true
+        },
+        {
+          "name": "addr-type",
+          "type": "string",
+          "usage": "address type: public | random (auto if blank)",
+          "inherited": true
+        },
+        {
+          "name": "bdaddr",
+          "shorthand": "b",
+          "type": "string",
+          "usage": "remote BD_ADDR (XX:XX:XX:XX:XX:XX)",
+          "inherited": true
+        },
+        {
+          "name": "format",
+          "shorthand": "o",
+          "type": "string",
+          "default": "text",
+          "usage": "output format: text | json | jsonl (json/jsonl output is authoritative; do not re-run in text mode)",
+          "inherited": true
+        },
+        {
+          "name": "json",
+          "type": "bool",
+          "default": "false",
+          "usage": "deprecated alias for --format jsonl",
+          "inherited": true,
+          "hidden": true
+        },
+        {
+          "name": "quiet",
+          "shorthand": "q",
+          "type": "bool",
+          "default": "false",
+          "usage": "suppress informational status lines on stderr (data + errors still emitted)",
+          "inherited": true
+        },
+        {
+          "name": "timeout",
+          "shorthand": "t",
+          "type": "int",
+          "default": "45",
+          "usage": "operation timeout, seconds",
+          "inherited": true
+        },
+        {
+          "name": "verbose",
+          "shorthand": "v",
+          "type": "bool",
+          "default": "false",
+          "usage": "verbose diagnostic logging on stderr",
+          "inherited": true
+        },
+        {
+          "name": "wait",
+          "type": "int",
+          "default": "3",
+          "usage": "seconds to wait for Connected=false"
+        }
+      ]
+    },
+    {
+      "path": "caeruleus doctor",
+      "use": "doctor",
+      "short": "One-shot adapter / bluetoothd health summary with suggested fixes",
+      "runnable": true,
+      "flags": [
+        {
+          "name": "adapter",
+          "shorthand": "i",
+          "type": "string",
+          "default": "hci0",
+          "usage": "HCI adapter name (e.g. hci0)",
+          "inherited": true
+        },
+        {
+          "name": "addr-type",
+          "type": "string",
+          "usage": "address type: public | random (auto if blank)",
+          "inherited": true
+        },
+        {
+          "name": "bdaddr",
+          "shorthand": "b",
+          "type": "string",
+          "usage": "remote BD_ADDR (XX:XX:XX:XX:XX:XX)",
+          "inherited": true
+        },
+        {
+          "name": "format",
+          "shorthand": "o",
+          "type": "string",
+          "default": "text",
+          "usage": "output format: text | json | jsonl (json/jsonl output is authoritative; do not re-run in text mode)",
+          "inherited": true
+        },
+        {
+          "name": "json",
+          "type": "bool",
+          "default": "false",
+          "usage": "deprecated alias for --format jsonl",
+          "inherited": true,
+          "hidden": true
+        },
+        {
+          "name": "quiet",
+          "shorthand": "q",
+          "type": "bool",
+          "default": "false",
+          "usage": "suppress informational status lines on stderr (data + errors still emitted)",
+          "inherited": true
+        },
+        {
+          "name": "timeout",
+          "shorthand": "t",
+          "type": "int",
+          "default": "45",
+          "usage": "operation timeout, seconds",
+          "inherited": true
+        },
+        {
+          "name": "verbose",
+          "shorthand": "v",
+          "type": "bool",
+          "default": "false",
+          "usage": "verbose diagnostic logging on stderr",
+          "inherited": true
+        }
+      ]
+    },
+    {
+      "path": "caeruleus enumerate",
+      "use": "enumerate",
+      "short": "Print a device's full GATT tree as a table (--values also reads each characteristic)",
+      "aliases": [
+        "enum"
+      ],
+      "runnable": true,
+      "flags": [
+        {
+          "name": "adapter",
+          "shorthand": "i",
+          "type": "string",
+          "default": "hci0",
+          "usage": "HCI adapter name (e.g. hci0)",
+          "inherited": true
+        },
+        {
+          "name": "addr-type",
+          "type": "string",
+          "usage": "address type: public | random (auto if blank)",
+          "inherited": true
+        },
+        {
+          "name": "bdaddr",
+          "shorthand": "b",
+          "type": "string",
+          "usage": "remote BD_ADDR (XX:XX:XX:XX:XX:XX)",
+          "inherited": true
+        },
+        {
+          "name": "compact",
+          "type": "bool",
+          "default": "false",
+          "usage": "emit one key=value line per characteristic instead of the wide table (token-efficient for scripts / LLMs)"
+        },
+        {
+          "name": "format",
+          "shorthand": "o",
+          "type": "string",
+          "default": "text",
+          "usage": "output format: text | json | jsonl (json/jsonl output is authoritative; do not re-run in text mode)",
+          "inherited": true
+        },
+        {
+          "name": "json",
+          "type": "bool",
+          "default": "false",
+          "usage": "deprecated alias for --format jsonl",
+          "inherited": true,
+          "hidden": true
+        },
+        {
+          "name": "max-len",
+          "type": "int",
+          "default": "64",
+          "usage": "truncate displayed values to this many bytes"
+        },
+        {
+          "name": "quiet",
+          "shorthand": "q",
+          "type": "bool",
+          "default": "false",
+          "usage": "suppress informational status lines on stderr (data + errors still emitted)",
+          "inherited": true
+        },
+        {
+          "name": "raw",
+          "type": "bool",
+          "default": "false",
+          "usage": "discover the GATT DB directly over raw ATT (host/BlueZ-independent; TRUE handles, incl. GAP/GATT services BlueZ may hide); needs root"
+        },
+        {
+          "name": "timeout",
+          "shorthand": "t",
+          "type": "int",
+          "default": "45",
+          "usage": "operation timeout, seconds",
+          "inherited": true
+        },
+        {
+          "name": "values",
+          "type": "bool",
+          "default": "false",
+          "usage": "read each readable characteristic and include its value (slow; opt in only)"
+        },
+        {
+          "name": "verbose",
+          "shorthand": "v",
+          "type": "bool",
+          "default": "false",
+          "usage": "verbose diagnostic logging on stderr",
+          "inherited": true
+        }
+      ]
+    },
+    {
+      "path": "caeruleus forget",
+      "use": "forget",
+      "short": "Tell bluetoothd to purge cached state for -b BDADDR",
+      "aliases": [
+        "rm",
+        "remove"
+      ],
+      "runnable": true,
+      "flags": [
+        {
+          "name": "adapter",
+          "shorthand": "i",
+          "type": "string",
+          "default": "hci0",
+          "usage": "HCI adapter name (e.g. hci0)",
+          "inherited": true
+        },
+        {
+          "name": "addr-type",
+          "type": "string",
+          "usage": "address type: public | random (auto if blank)",
+          "inherited": true
+        },
+        {
+          "name": "bdaddr",
+          "shorthand": "b",
+          "type": "string",
+          "usage": "remote BD_ADDR (XX:XX:XX:XX:XX:XX)",
+          "inherited": true
+        },
+        {
+          "name": "format",
+          "shorthand": "o",
+          "type": "string",
+          "default": "text",
+          "usage": "output format: text | json | jsonl (json/jsonl output is authoritative; do not re-run in text mode)",
+          "inherited": true
+        },
+        {
+          "name": "json",
+          "type": "bool",
+          "default": "false",
+          "usage": "deprecated alias for --format jsonl",
+          "inherited": true,
+          "hidden": true
+        },
+        {
+          "name": "quiet",
+          "shorthand": "q",
+          "type": "bool",
+          "default": "false",
+          "usage": "suppress informational status lines on stderr (data + errors still emitted)",
+          "inherited": true
+        },
+        {
+          "name": "timeout",
+          "shorthand": "t",
+          "type": "int",
+          "default": "45",
+          "usage": "operation timeout, seconds",
+          "inherited": true
+        },
+        {
+          "name": "verbose",
+          "shorthand": "v",
+          "type": "bool",
+          "default": "false",
+          "usage": "verbose diagnostic logging on stderr",
+          "inherited": true
+        }
+      ]
+    },
+    {
+      "path": "caeruleus fuzz",
+      "use": "fuzz",
+      "short": "Fuzz a GATT server (mutates writes, classifies responses)",
+      "runnable": false,
+      "flags": [
+        {
+          "name": "adapter",
+          "shorthand": "i",
+          "type": "string",
+          "default": "hci0",
+          "usage": "HCI adapter name (e.g. hci0)",
+          "inherited": true
+        },
+        {
+          "name": "addr-type",
+          "type": "string",
+          "usage": "address type: public | random (auto if blank)",
+          "inherited": true
+        },
+        {
+          "name": "bdaddr",
+          "shorthand": "b",
+          "type": "string",
+          "usage": "remote BD_ADDR (XX:XX:XX:XX:XX:XX)",
+          "inherited": true
+        },
+        {
+          "name": "format",
+          "shorthand": "o",
+          "type": "string",
+          "default": "text",
+          "usage": "output format: text | json | jsonl (json/jsonl output is authoritative; do not re-run in text mode)",
+          "inherited": true
+        },
+        {
+          "name": "json",
+          "type": "bool",
+          "default": "false",
+          "usage": "deprecated alias for --format jsonl",
+          "inherited": true,
+          "hidden": true
+        },
+        {
+          "name": "quiet",
+          "shorthand": "q",
+          "type": "bool",
+          "default": "false",
+          "usage": "suppress informational status lines on stderr (data + errors still emitted)",
+          "inherited": true
+        },
+        {
+          "name": "timeout",
+          "shorthand": "t",
+          "type": "int",
+          "default": "45",
+          "usage": "operation timeout, seconds",
+          "inherited": true
+        },
+        {
+          "name": "verbose",
+          "shorthand": "v",
+          "type": "bool",
+          "default": "false",
+          "usage": "verbose diagnostic logging on stderr",
+          "inherited": true
+        }
+      ]
+    },
+    {
+      "path": "caeruleus fuzz replay",
+      "use": "replay PATH",
+      "short": "Re-send inputs from a saved corpus file or directory",
+      "runnable": true,
+      "flags": [
+        {
+          "name": "adapter",
+          "shorthand": "i",
+          "type": "string",
+          "default": "hci0",
+          "usage": "HCI adapter name (e.g. hci0)",
+          "inherited": true
+        },
+        {
+          "name": "addr-type",
+          "type": "string",
+          "usage": "address type: public | random (auto if blank)",
+          "inherited": true
+        },
+        {
+          "name": "bdaddr",
+          "shorthand": "b",
+          "type": "string",
+          "usage": "remote BD_ADDR (XX:XX:XX:XX:XX:XX)",
+          "inherited": true
+        },
+        {
+          "name": "format",
+          "shorthand": "o",
+          "type": "string",
+          "default": "text",
+          "usage": "output format: text | json | jsonl (json/jsonl output is authoritative; do not re-run in text mode)",
+          "inherited": true
+        },
+        {
+          "name": "handle",
+          "shorthand": "a",
+          "type": "string",
+          "usage": "target characteristic/descriptor handle"
+        },
+        {
+          "name": "json",
+          "type": "bool",
+          "default": "false",
+          "usage": "deprecated alias for --format jsonl",
+          "inherited": true,
+          "hidden": true
+        },
+        {
+          "name": "op",
+          "type": "string",
+          "default": "req",
+          "usage": "write variant for replay: req | cmd"
+        },
+        {
+          "name": "quiet",
+          "shorthand": "q",
+          "type": "bool",
+          "default": "false",
+          "usage": "suppress informational status lines on stderr (data + errors still emitted)",
+          "inherited": true
+        },
+        {
+          "name": "timeout",
+          "shorthand": "t",
+          "type": "int",
+          "default": "45",
+          "usage": "operation timeout, seconds",
+          "inherited": true
+        },
+        {
+          "name": "uuid",
+          "shorthand": "u",
+          "type": "string",
+          "usage": "target characteristic UUID (alternative to --handle)"
+        },
+        {
+          "name": "verbose",
+          "shorthand": "v",
+          "type": "bool",
+          "default": "false",
+          "usage": "verbose diagnostic logging on stderr",
+          "inherited": true
+        }
+      ]
+    },
+    {
+      "path": "caeruleus fuzz write",
+      "use": "write",
+      "short": "Fuzz writes to a single characteristic",
+      "runnable": true,
+      "flags": [
+        {
+          "name": "adapter",
+          "shorthand": "i",
+          "type": "string",
+          "default": "hci0",
+          "usage": "HCI adapter name (e.g. hci0)",
+          "inherited": true
+        },
+        {
+          "name": "addr-type",
+          "type": "string",
+          "usage": "address type: public | random (auto if blank)",
+          "inherited": true
+        },
+        {
+          "name": "bdaddr",
+          "shorthand": "b",
+          "type": "string",
+          "usage": "remote BD_ADDR (XX:XX:XX:XX:XX:XX)",
+          "inherited": true
+        },
+        {
+          "name": "format",
+          "shorthand": "o",
+          "type": "string",
+          "default": "text",
+          "usage": "output format: text | json | jsonl (json/jsonl output is authoritative; do not re-run in text mode)",
+          "inherited": true
+        },
+        {
+          "name": "handle",
+          "shorthand": "a",
+          "type": "string",
+          "usage": "target characteristic/descriptor handle"
+        },
+        {
+          "name": "include",
+          "type": "string",
+          "usage": "extra opcodes to enable, comma-separated: prep, exec (implies --raw)"
+        },
+        {
+          "name": "json",
+          "type": "bool",
+          "default": "false",
+          "usage": "deprecated alias for --format jsonl",
+          "inherited": true,
+          "hidden": true
+        },
+        {
+          "name": "liveness-every",
+          "type": "int",
+          "default": "10",
+          "usage": "probe target liveness every N iterations"
+        },
+        {
+          "name": "liveness-handle",
+          "type": "string",
+          "usage": "override auto-detected liveness handle"
+        },
+        {
+          "name": "max-iter",
+          "type": "int",
+          "default": "10000",
+          "usage": "iteration cap (0 = unlimited)"
+        },
+        {
+          "name": "max-time",
+          "type": "duration",
+          "default": "0s",
+          "usage": "wall-clock cap (e.g. 30m, 8h)"
+        },
+        {
+          "name": "max-value-len",
+          "type": "int",
+          "default": "244",
+          "usage": "hard cap on mutated input length (244 = MTU 247 - 3 ATT bytes)"
+        },
+        {
+          "name": "no-boundary-seeds",
+          "type": "bool",
+          "default": "false",
+          "usage": "in --raw mode, skip the auto-added MTU-boundary length seeds"
+        },
+        {
+          "name": "no-liveness",
+          "type": "bool",
+          "default": "false",
+          "usage": "disable liveness probing entirely (disconnect is the only crash signal)"
+        },
+        {
+          "name": "no-seed",
+          "type": "bool",
+          "default": "false",
+          "usage": "skip auto-read; start from an empty seed"
+        },
+        {
+          "name": "no-state-feedback",
+          "type": "bool",
+          "default": "false",
+          "usage": "treat every input as parentless; disable input prioritisation"
+        },
+        {
+          "name": "out",
+          "type": "string",
+          "usage": "corpus output directory (default ./fuzz-out-<ISO>/)"
+        },
+        {
+          "name": "quiet",
+          "shorthand": "q",
+          "type": "bool",
+          "default": "false",
+          "usage": "suppress informational status lines on stderr (data + errors still emitted)",
+          "inherited": true
+        },
+        {
+          "name": "raw",
+          "type": "bool",
+          "default": "false",
+          "usage": "drive writes via raw L2CAP/ATT (Layer B) instead of BlueZ D-Bus; required for prep/exec"
+        },
+        {
+          "name": "rng-seed",
+          "type": "int64",
+          "default": "0",
+          "usage": "RNG seed (default: time-based; printed at startup)"
+        },
+        {
+          "name": "seed",
+          "type": "string",
+          "usage": "ASCII seed (alternative to --seed-file)"
+        },
+        {
+          "name": "seed-dir",
+          "type": "string",
+          "usage": "directory of seed files; all .bin are loaded"
+        },
+        {
+          "name": "seed-file",
+          "type": "string",
+          "usage": "raw seed file (overrides auto-read)"
+        },
+        {
+          "name": "target-reset",
+          "type": "string",
+          "usage": "shell command to reset the target after consecutive liveness failures"
+        },
+        {
+          "name": "target-reset-after",
+          "type": "int",
+          "default": "3",
+          "usage": "fire --target-reset after this many consecutive liveness failures"
+        },
+        {
+          "name": "timeout",
+          "shorthand": "t",
+          "type": "int",
+          "default": "45",
+          "usage": "operation timeout, seconds",
+          "inherited": true
+        },
+        {
+          "name": "type",
+          "type": "string",
+          "default": "req",
+          "usage": "write variant(s): req | cmd | both"
+        },
+        {
+          "name": "uuid",
+          "shorthand": "u",
+          "type": "string",
+          "usage": "target characteristic UUID (alternative to --handle)"
+        },
+        {
+          "name": "verbose",
+          "shorthand": "v",
+          "type": "bool",
+          "default": "false",
+          "usage": "verbose diagnostic logging on stderr",
+          "inherited": true
+        }
+      ]
+    },
+    {
+      "path": "caeruleus listen",
+      "use": "listen",
+      "short": "Subscribe to notifications/indications on a characteristic",
+      "aliases": [
+        "notify",
+        "subscribe"
+      ],
+      "runnable": true,
+      "flags": [
+        {
+          "name": "adapter",
+          "shorthand": "i",
+          "type": "string",
+          "default": "hci0",
+          "usage": "HCI adapter name (e.g. hci0)",
+          "inherited": true
+        },
+        {
+          "name": "addr-type",
+          "type": "string",
+          "usage": "address type: public | random (auto if blank)",
+          "inherited": true
+        },
+        {
+          "name": "bdaddr",
+          "shorthand": "b",
+          "type": "string",
+          "usage": "remote BD_ADDR (XX:XX:XX:XX:XX:XX)",
+          "inherited": true
+        },
+        {
+          "name": "count",
+          "type": "int",
+          "default": "0",
+          "usage": "stop after receiving this many notifications (0 = unlimited; auto-set to 1 when --trigger-value is given and --count isn't)"
+        },
+        {
+          "name": "duration",
+          "shorthand": "d",
+          "type": "int",
+          "default": "5",
+          "usage": "stop after this many seconds (0 = forever)"
+        },
+        {
+          "name": "extract",
+          "type": "bool",
+          "default": "false",
+          "usage": "print just the hex payload per event (lossless, one line each) - pipe to `write -n`"
+        },
+        {
+          "name": "format",
+          "shorthand": "o",
+          "type": "string",
+          "default": "text",
+          "usage": "output format: text | json | jsonl (json/jsonl output is authoritative; do not re-run in text mode)",
+          "inherited": true
+        },
+        {
+          "name": "handle",
+          "shorthand": "a",
+          "type": "string",
+          "usage": "ATT handle of the characteristic"
+        },
+        {
+          "name": "hidden",
+          "type": "bool",
+          "default": "false",
+          "usage": "don't call StartNotify - only watch via HCI monitor (for chars that don't advertise notify; needs --monitor on)"
+        },
+        {
+          "name": "json",
+          "type": "bool",
+          "default": "false",
+          "usage": "deprecated alias for --format jsonl",
+          "inherited": true,
+          "hidden": true
+        },
+        {
+          "name": "monitor",
+          "type": "string",
+          "default": "auto",
+          "usage": "fan in HCI monitor socket events too: auto|on|off (auto = on if euid==0)"
+        },
+        {
+          "name": "quiet",
+          "shorthand": "q",
+          "type": "bool",
+          "default": "false",
+          "usage": "suppress informational status lines on stderr (data + errors still emitted)",
+          "inherited": true
+        },
+        {
+          "name": "retry",
+          "type": "int",
+          "default": "0",
+          "usage": "retry the entire listen window up to N times on transient BlueZ/HCI errors"
+        },
+        {
+          "name": "retry-delay",
+          "type": "duration",
+          "default": "500ms",
+          "usage": "delay between retries"
+        },
+        {
+          "name": "timeout",
+          "shorthand": "t",
+          "type": "int",
+          "default": "45",
+          "usage": "operation timeout, seconds",
+          "inherited": true
+        },
+        {
+          "name": "trigger-count",
+          "type": "int",
+          "default": "1",
+          "usage": "number of times to fire --trigger-value (use with --count 0 to capture every response)"
+        },
+        {
+          "name": "trigger-handle",
+          "type": "string",
+          "usage": "handle to write the trigger value to (defaults to the listen handle)"
+        },
+        {
+          "name": "trigger-interval",
+          "type": "duration",
+          "default": "300ms",
+          "usage": "delay between repeated triggers"
+        },
+        {
+          "name": "trigger-value",
+          "type": "string",
+          "usage": "hex value to write before listening (forces a notify); pairs with --trigger-count for repeated fires"
+        },
+        {
+          "name": "uuid",
+          "shorthand": "u",
+          "type": "string",
+          "usage": "characteristic UUID"
+        },
+        {
+          "name": "verbose",
+          "shorthand": "v",
+          "type": "bool",
+          "default": "false",
+          "usage": "verbose diagnostic logging on stderr",
+          "inherited": true
+        }
+      ]
+    },
+    {
+      "path": "caeruleus monitor",
+      "use": "monitor",
+      "short": "Passively decode ATT notifications/indications from the HCI monitor socket (needs root)",
+      "runnable": true,
+      "flags": [
+        {
+          "name": "adapter",
+          "shorthand": "i",
+          "type": "string",
+          "default": "hci0",
+          "usage": "HCI adapter name (e.g. hci0)",
+          "inherited": true
+        },
+        {
+          "name": "addr-type",
+          "type": "string",
+          "usage": "address type: public | random (auto if blank)",
+          "inherited": true
+        },
+        {
+          "name": "bdaddr",
+          "shorthand": "b",
+          "type": "string",
+          "usage": "remote BD_ADDR (XX:XX:XX:XX:XX:XX)",
+          "inherited": true
+        },
+        {
+          "name": "count",
+          "type": "int",
+          "default": "0",
+          "usage": "stop after receiving this many events (0 = no limit)"
+        },
+        {
+          "name": "duration",
+          "shorthand": "d",
+          "type": "int",
+          "default": "10",
+          "usage": "stop after this many seconds (0 = forever)"
+        },
+        {
+          "name": "extract",
+          "type": "bool",
+          "default": "false",
+          "usage": "print just the hex payload per event (one line each) - parity with listen --extract"
+        },
+        {
+          "name": "format",
+          "shorthand": "o",
+          "type": "string",
+          "default": "text",
+          "usage": "output format: text | json | jsonl (json/jsonl output is authoritative; do not re-run in text mode)",
+          "inherited": true
+        },
+        {
+          "name": "handle",
+          "shorthand": "a",
+          "type": "string",
+          "usage": "only print events whose PDU att-handle matches (NOT the subscribed char - drop the filter first if unsure)"
+        },
+        {
+          "name": "json",
+          "type": "bool",
+          "default": "false",
+          "usage": "deprecated alias for --format jsonl",
+          "inherited": true,
+          "hidden": true
+        },
+        {
+          "name": "quiet",
+          "shorthand": "q",
+          "type": "bool",
+          "default": "false",
+          "usage": "suppress informational status lines on stderr (data + errors still emitted)",
+          "inherited": true
+        },
+        {
+          "name": "timeout",
+          "shorthand": "t",
+          "type": "int",
+          "default": "45",
+          "usage": "operation timeout, seconds",
+          "inherited": true
+        },
+        {
+          "name": "verbose",
+          "shorthand": "v",
+          "type": "bool",
+          "default": "false",
+          "usage": "verbose diagnostic logging on stderr",
+          "inherited": true
+        }
+      ]
+    },
+    {
+      "path": "caeruleus mtu",
+      "use": "mtu",
+      "short": "Read or set the requested ATT MTU (set/reset require root + bluetoothd restart)",
+      "runnable": true,
+      "flags": [
+        {
+          "name": "adapter",
+          "shorthand": "i",
+          "type": "string",
+          "default": "hci0",
+          "usage": "HCI adapter name (e.g. hci0)",
+          "inherited": true
+        },
+        {
+          "name": "addr-type",
+          "type": "string",
+          "usage": "address type: public | random (auto if blank)",
+          "inherited": true
+        },
+        {
+          "name": "bdaddr",
+          "shorthand": "b",
+          "type": "string",
+          "usage": "remote BD_ADDR (XX:XX:XX:XX:XX:XX)",
+          "inherited": true
+        },
+        {
+          "name": "conf-dir",
+          "type": "string",
+          "default": "/etc/bluetooth",
+          "usage": "bluetooth config directory"
+        },
+        {
+          "name": "dry-run",
+          "type": "bool",
+          "default": "false",
+          "usage": "print the planned edit without writing or restarting"
+        },
+        {
+          "name": "force",
+          "type": "bool",
+          "default": "false",
+          "usage": "accept --set values outside the safe band without prompting"
+        },
+        {
+          "name": "format",
+          "shorthand": "o",
+          "type": "string",
+          "default": "text",
+          "usage": "output format: text | json | jsonl (json/jsonl output is authoritative; do not re-run in text mode)",
+          "inherited": true
+        },
+        {
+          "name": "json",
+          "type": "bool",
+          "default": "false",
+          "usage": "deprecated alias for --format jsonl",
+          "inherited": true,
+          "hidden": true
+        },
+        {
+          "name": "no-wait",
+          "type": "bool",
+          "default": "false",
+          "usage": "do not wait for bluetoothd to come back up after restart"
+        },
+        {
+          "name": "quiet",
+          "shorthand": "q",
+          "type": "bool",
+          "default": "false",
+          "usage": "suppress informational status lines on stderr (data + errors still emitted)",
+          "inherited": true
+        },
+        {
+          "name": "reset",
+          "type": "bool",
+          "default": "false",
+          "usage": "restore ExchangeMTU to a safe interoperable default (247). Combine with --to-spec-default for 517. PROMPTS on TTY; pair with -y for scripts."
+        },
+        {
+          "name": "revert",
+          "type": "bool",
+          "default": "false",
+          "usage": "restore the value snapshotted before the last --set/--reset"
+        },
+        {
+          "name": "set",
+          "type": "int",
+          "default": "0",
+          "usage": "request this ATT MTU on the next connection (23..517). PROMPTS on TTY; pair with -y for scripts."
+        },
+        {
+          "name": "show",
+          "type": "bool",
+          "default": "false",
+          "usage": "show the current connection's negotiated MTU"
+        },
+        {
+          "name": "timeout",
+          "shorthand": "t",
+          "type": "int",
+          "default": "45",
+          "usage": "operation timeout, seconds",
+          "inherited": true
+        },
+        {
+          "name": "to-spec-default",
+          "type": "bool",
+          "default": "false",
+          "usage": "with --reset, write 517 (BLE spec max) instead of the interoperable default (247)"
+        },
+        {
+          "name": "verbose",
+          "shorthand": "v",
+          "type": "bool",
+          "default": "false",
+          "usage": "verbose diagnostic logging on stderr",
+          "inherited": true
+        },
+        {
+          "name": "yes",
+          "shorthand": "y",
+          "type": "bool",
+          "default": "false",
+          "usage": "skip the disruptive-op confirmation prompt"
+        }
+      ]
+    },
+    {
+      "path": "caeruleus pair",
+      "use": "pair",
+      "short": "Pair / bond with -b BDADDR (BlueZ Device1.Pair)",
+      "runnable": true,
+      "flags": [
+        {
+          "name": "adapter",
+          "shorthand": "i",
+          "type": "string",
+          "default": "hci0",
+          "usage": "HCI adapter name (e.g. hci0)",
+          "inherited": true
+        },
+        {
+          "name": "addr-type",
+          "type": "string",
+          "usage": "address type: public | random (auto if blank)",
+          "inherited": true
+        },
+        {
+          "name": "bdaddr",
+          "shorthand": "b",
+          "type": "string",
+          "usage": "remote BD_ADDR (XX:XX:XX:XX:XX:XX)",
+          "inherited": true
+        },
+        {
+          "name": "format",
+          "shorthand": "o",
+          "type": "string",
+          "default": "text",
+          "usage": "output format: text | json | jsonl (json/jsonl output is authoritative; do not re-run in text mode)",
+          "inherited": true
+        },
+        {
+          "name": "io",
+          "type": "string",
+          "default": "none",
+          "usage": "IO capability: none|display-only|keyboard-only|display-yesno|keyboard-display"
+        },
+        {
+          "name": "json",
+          "type": "bool",
+          "default": "false",
+          "usage": "deprecated alias for --format jsonl",
+          "inherited": true,
+          "hidden": true
+        },
+        {
+          "name": "oob",
+          "type": "string",
+          "usage": "OOB secret as hex: 32 chars (legacy TK) or confirm:random (SC, 32:32 chars)"
+        },
+        {
+          "name": "pair-mode",
+          "type": "string",
+          "default": "auto",
+          "usage": "pairing strategy: send-pairing|receive-pairing|auto"
+        },
+        {
+          "name": "passkey",
+          "type": "string",
+          "usage": "passkey for Passkey Entry: digits, or '-' to prompt interactively"
+        },
+        {
+          "name": "quiet",
+          "shorthand": "q",
+          "type": "bool",
+          "default": "false",
+          "usage": "suppress informational status lines on stderr (data + errors still emitted)",
+          "inherited": true
+        },
+        {
+          "name": "rebond",
+          "type": "bool",
+          "default": "false",
+          "usage": "drop any existing bond first, then pair fresh"
+        },
+        {
+          "name": "timeout",
+          "shorthand": "t",
+          "type": "int",
+          "default": "45",
+          "usage": "operation timeout, seconds",
+          "inherited": true
+        },
+        {
+          "name": "verbose",
+          "shorthand": "v",
+          "type": "bool",
+          "default": "false",
+          "usage": "verbose diagnostic logging on stderr",
+          "inherited": true
+        }
+      ]
+    },
+    {
+      "path": "caeruleus primary",
+      "use": "primary",
+      "short": "List primary services (gatttool --primary)",
+      "runnable": true,
+      "flags": [
+        {
+          "name": "adapter",
+          "shorthand": "i",
+          "type": "string",
+          "default": "hci0",
+          "usage": "HCI adapter name (e.g. hci0)",
+          "inherited": true
+        },
+        {
+          "name": "addr-type",
+          "type": "string",
+          "usage": "address type: public | random (auto if blank)",
+          "inherited": true
+        },
+        {
+          "name": "bdaddr",
+          "shorthand": "b",
+          "type": "string",
+          "usage": "remote BD_ADDR (XX:XX:XX:XX:XX:XX)",
+          "inherited": true
+        },
+        {
+          "name": "format",
+          "shorthand": "o",
+          "type": "string",
+          "default": "text",
+          "usage": "output format: text | json | jsonl (json/jsonl output is authoritative; do not re-run in text mode)",
+          "inherited": true
+        },
+        {
+          "name": "json",
+          "type": "bool",
+          "default": "false",
+          "usage": "deprecated alias for --format jsonl",
+          "inherited": true,
+          "hidden": true
+        },
+        {
+          "name": "quiet",
+          "shorthand": "q",
+          "type": "bool",
+          "default": "false",
+          "usage": "suppress informational status lines on stderr (data + errors still emitted)",
+          "inherited": true
+        },
+        {
+          "name": "timeout",
+          "shorthand": "t",
+          "type": "int",
+          "default": "45",
+          "usage": "operation timeout, seconds",
+          "inherited": true
+        },
+        {
+          "name": "verbose",
+          "shorthand": "v",
+          "type": "bool",
+          "default": "false",
+          "usage": "verbose diagnostic logging on stderr",
+          "inherited": true
+        }
+      ]
+    },
+    {
+      "path": "caeruleus raw-write",
+      "use": "raw-write",
+      "short": "Single-PDU ATT Write Request via raw L2CAP (bypasses BlueZ MTU + fragmentation)",
+      "runnable": true,
+      "flags": [
+        {
+          "name": "adapter",
+          "shorthand": "i",
+          "type": "string",
+          "default": "hci0",
+          "usage": "HCI adapter name (e.g. hci0)",
+          "inherited": true
+        },
+        {
+          "name": "addr-type",
+          "type": "string",
+          "usage": "address type: public | random (auto if blank)",
+          "inherited": true
+        },
+        {
+          "name": "bdaddr",
+          "shorthand": "b",
+          "type": "string",
+          "usage": "remote BD_ADDR (XX:XX:XX:XX:XX:XX)",
+          "inherited": true
+        },
+        {
+          "name": "format",
+          "shorthand": "o",
+          "type": "string",
+          "default": "text",
+          "usage": "output format: text | json | jsonl (json/jsonl output is authoritative; do not re-run in text mode)",
+          "inherited": true
+        },
+        {
+          "name": "handle",
+          "shorthand": "a",
+          "type": "string",
+          "usage": "target ATT handle (e.g. 0x001e)"
+        },
+        {
+          "name": "json",
+          "type": "bool",
+          "default": "false",
+          "usage": "deprecated alias for --format jsonl",
+          "inherited": true,
+          "hidden": true
+        },
+        {
+          "name": "length",
+          "type": "int",
+          "default": "0",
+          "usage": "value length when using --pattern"
+        },
+        {
+          "name": "pattern",
+          "type": "string",
+          "default": "0x41",
+          "usage": "byte pattern to fill --length bytes (default 0x41 'A')"
+        },
+        {
+          "name": "quiet",
+          "shorthand": "q",
+          "type": "bool",
+          "default": "false",
+          "usage": "suppress informational status lines on stderr (data + errors still emitted)",
+          "inherited": true
+        },
+        {
+          "name": "timeout",
+          "shorthand": "t",
+          "type": "int",
+          "default": "45",
+          "usage": "operation timeout, seconds",
+          "inherited": true
+        },
+        {
+          "name": "value",
+          "shorthand": "n",
+          "type": "string",
+          "usage": "explicit hex value (overrides --length/--pattern)"
+        },
+        {
+          "name": "verbose",
+          "shorthand": "v",
+          "type": "bool",
+          "default": "false",
+          "usage": "verbose diagnostic logging on stderr",
+          "inherited": true
+        }
+      ]
+    },
+    {
+      "path": "caeruleus read",
+      "use": "read",
+      "short": "Read a characteristic by handle (-a) or UUID (-u)",
+      "aliases": [
+        "char-read"
+      ],
+      "runnable": true,
+      "flags": [
+        {
+          "name": "adapter",
+          "shorthand": "i",
+          "type": "string",
+          "default": "hci0",
+          "usage": "HCI adapter name (e.g. hci0)",
+          "inherited": true
+        },
+        {
+          "name": "addr-type",
+          "type": "string",
+          "usage": "address type: public | random (auto if blank)",
+          "inherited": true
+        },
+        {
+          "name": "ascii",
+          "shorthand": "A",
+          "type": "bool",
+          "default": "false",
+          "usage": "print just the decoded ASCII payload, no key=value framing"
+        },
+        {
+          "name": "bdaddr",
+          "shorthand": "b",
+          "type": "string",
+          "usage": "remote BD_ADDR (XX:XX:XX:XX:XX:XX)",
+          "inherited": true
+        },
+        {
+          "name": "changes-only",
+          "type": "bool",
+          "default": "false",
+          "usage": "during --watch, only print when the value differs from the previous read"
+        },
+        {
+          "name": "duration",
+          "type": "duration",
+          "default": "0s",
+          "usage": "stop --watch after this duration (0 = until SIGINT)"
+        },
+        {
+          "name": "every",
+          "type": "duration",
+          "default": "100ms",
+          "usage": "watch poll interval"
+        },
+        {
+          "name": "extract",
+          "type": "bool",
+          "default": "false",
+          "usage": "print just the hex payload (lossless, single line) - pipe to `write -n` for round-trip"
+        },
+        {
+          "name": "format",
+          "shorthand": "o",
+          "type": "string",
+          "default": "text",
+          "usage": "output format: text | json | jsonl (json/jsonl output is authoritative; do not re-run in text mode)",
+          "inherited": true
+        },
+        {
+          "name": "handle",
+          "shorthand": "a",
+          "type": "string",
+          "usage": "ATT handle (e.g. 0x002a)"
+        },
+        {
+          "name": "json",
+          "type": "bool",
+          "default": "false",
+          "usage": "deprecated alias for --format jsonl",
+          "inherited": true,
+          "hidden": true
+        },
+        {
+          "name": "offset",
+          "type": "uint16",
+          "default": "0",
+          "usage": "read offset (for long reads)"
+        },
+        {
+          "name": "quiet",
+          "shorthand": "q",
+          "type": "bool",
+          "default": "false",
+          "usage": "suppress informational status lines on stderr (data + errors still emitted)",
+          "inherited": true
+        },
+        {
+          "name": "raw",
+          "type": "bool",
+          "default": "false",
+          "usage": "read the exact handle over raw ATT (root), bypassing BlueZ - reaches handles BlueZ doesn't expose (e.g. hidden GAP service chars on older BlueZ); pair with `enumerate --raw`"
+        },
+        {
+          "name": "retry",
+          "type": "int",
+          "default": "0",
+          "usage": "retry up to N times when the operation fails with a transient BlueZ/HCI error"
+        },
+        {
+          "name": "retry-delay",
+          "type": "duration",
+          "default": "500ms",
+          "usage": "delay between retries (e.g. 250ms, 2s)"
+        },
+        {
+          "name": "timeout",
+          "shorthand": "t",
+          "type": "int",
+          "default": "45",
+          "usage": "operation timeout, seconds",
+          "inherited": true
+        },
+        {
+          "name": "uuid",
+          "shorthand": "u",
+          "type": "string",
+          "usage": "characteristic UUID"
+        },
+        {
+          "name": "verbose",
+          "shorthand": "v",
+          "type": "bool",
+          "default": "false",
+          "usage": "verbose diagnostic logging on stderr",
+          "inherited": true
+        },
+        {
+          "name": "watch",
+          "type": "bool",
+          "default": "false",
+          "usage": "keep re-reading until SIGINT or --duration expires"
+        }
+      ]
+    },
+    {
+      "path": "caeruleus recipes",
+      "use": "recipes [search term]",
+      "short": "Find the right command by describing what you want to do",
+      "runnable": true,
+      "flags": [
+        {
+          "name": "adapter",
+          "shorthand": "i",
+          "type": "string",
+          "default": "hci0",
+          "usage": "HCI adapter name (e.g. hci0)",
+          "inherited": true
+        },
+        {
+          "name": "addr-type",
+          "type": "string",
+          "usage": "address type: public | random (auto if blank)",
+          "inherited": true
+        },
+        {
+          "name": "bdaddr",
+          "shorthand": "b",
+          "type": "string",
+          "usage": "remote BD_ADDR (XX:XX:XX:XX:XX:XX)",
+          "inherited": true
+        },
+        {
+          "name": "format",
+          "shorthand": "o",
+          "type": "string",
+          "default": "text",
+          "usage": "output format: text | json | jsonl (json/jsonl output is authoritative; do not re-run in text mode)",
+          "inherited": true
+        },
+        {
+          "name": "json",
+          "type": "bool",
+          "default": "false",
+          "usage": "deprecated alias for --format jsonl",
+          "inherited": true,
+          "hidden": true
+        },
+        {
+          "name": "quiet",
+          "shorthand": "q",
+          "type": "bool",
+          "default": "false",
+          "usage": "suppress informational status lines on stderr (data + errors still emitted)",
+          "inherited": true
+        },
+        {
+          "name": "timeout",
+          "shorthand": "t",
+          "type": "int",
+          "default": "45",
+          "usage": "operation timeout, seconds",
+          "inherited": true
+        },
+        {
+          "name": "verbose",
+          "shorthand": "v",
+          "type": "bool",
+          "default": "false",
+          "usage": "verbose diagnostic logging on stderr",
+          "inherited": true
+        }
+      ]
+    },
+    {
+      "path": "caeruleus recon",
+      "use": "recon",
+      "short": "Profile -b BDADDR: fingerprint (DIS), service map, and GATT audit",
+      "runnable": true,
+      "flags": [
+        {
+          "name": "adapter",
+          "shorthand": "i",
+          "type": "string",
+          "default": "hci0",
+          "usage": "HCI adapter name (e.g. hci0)",
+          "inherited": true
+        },
+        {
+          "name": "addr-type",
+          "type": "string",
+          "usage": "address type: public | random (auto if blank)",
+          "inherited": true
+        },
+        {
+          "name": "bdaddr",
+          "shorthand": "b",
+          "type": "string",
+          "usage": "remote BD_ADDR (XX:XX:XX:XX:XX:XX)",
+          "inherited": true
+        },
+        {
+          "name": "format",
+          "shorthand": "o",
+          "type": "string",
+          "default": "text",
+          "usage": "output format: text | json | jsonl (json/jsonl output is authoritative; do not re-run in text mode)",
+          "inherited": true
+        },
+        {
+          "name": "json",
+          "type": "bool",
+          "default": "false",
+          "usage": "deprecated alias for --format jsonl",
+          "inherited": true,
+          "hidden": true
+        },
+        {
+          "name": "quiet",
+          "shorthand": "q",
+          "type": "bool",
+          "default": "false",
+          "usage": "suppress informational status lines on stderr (data + errors still emitted)",
+          "inherited": true
+        },
+        {
+          "name": "timeout",
+          "shorthand": "t",
+          "type": "int",
+          "default": "45",
+          "usage": "operation timeout, seconds",
+          "inherited": true
+        },
+        {
+          "name": "verbose",
+          "shorthand": "v",
+          "type": "bool",
+          "default": "false",
+          "usage": "verbose diagnostic logging on stderr",
+          "inherited": true
+        }
+      ]
+    },
+    {
+      "path": "caeruleus scan",
+      "use": "scan",
+      "short": "Scan for nearby BLE devices",
+      "runnable": true,
+      "flags": [
+        {
+          "name": "adapter",
+          "shorthand": "i",
+          "type": "string",
+          "default": "hci0",
+          "usage": "HCI adapter name (e.g. hci0)",
+          "inherited": true
+        },
+        {
+          "name": "addr-type",
+          "type": "string",
+          "usage": "address type: public | random (auto if blank)",
+          "inherited": true
+        },
+        {
+          "name": "bdaddr",
+          "shorthand": "b",
+          "type": "string",
+          "usage": "remote BD_ADDR (XX:XX:XX:XX:XX:XX)",
+          "inherited": true
+        },
+        {
+          "name": "duration",
+          "shorthand": "d",
+          "type": "int",
+          "default": "8",
+          "usage": "scan duration in seconds"
+        },
+        {
+          "name": "format",
+          "shorthand": "o",
+          "type": "string",
+          "default": "text",
+          "usage": "output format: text | json | jsonl (json/jsonl output is authoritative; do not re-run in text mode)",
+          "inherited": true
+        },
+        {
+          "name": "include-cached",
+          "type": "bool",
+          "default": "false",
+          "usage": "also show devices BlueZ cached from previous scans, not just those actively advertising"
+        },
+        {
+          "name": "json",
+          "type": "bool",
+          "default": "false",
+          "usage": "deprecated alias for --format jsonl",
+          "inherited": true,
+          "hidden": true
+        },
+        {
+          "name": "keep-filter",
+          "type": "bool",
+          "default": "false",
+          "usage": "leave the DiscoveryFilter in place after scan returns (default: clear it)"
+        },
+        {
+          "name": "live",
+          "type": "bool",
+          "default": "false",
+          "usage": "stream devices as they are discovered/updated instead of printing one table at the end"
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "usage": "only print devices whose name matches this substring"
+        },
+        {
+          "name": "prefix",
+          "type": "string",
+          "usage": "only print devices whose address starts with this prefix"
+        },
+        {
+          "name": "quiet",
+          "shorthand": "q",
+          "type": "bool",
+          "default": "false",
+          "usage": "suppress informational status lines on stderr (data + errors still emitted)",
+          "inherited": true
+        },
+        {
+          "name": "timeout",
+          "shorthand": "t",
+          "type": "int",
+          "default": "45",
+          "usage": "operation timeout, seconds",
+          "inherited": true
+        },
+        {
+          "name": "verbose",
+          "shorthand": "v",
+          "type": "bool",
+          "default": "false",
+          "usage": "verbose diagnostic logging on stderr",
+          "inherited": true
+        }
+      ]
+    },
+    {
+      "path": "caeruleus send",
+      "use": "send",
+      "short": "Send one shell command to a running 'caeruleus serve' daemon",
+      "runnable": true,
+      "flags": [
+        {
+          "name": "adapter",
+          "shorthand": "i",
+          "type": "string",
+          "default": "hci0",
+          "usage": "HCI adapter name (e.g. hci0)",
+          "inherited": true
+        },
+        {
+          "name": "addr-type",
+          "type": "string",
+          "usage": "address type: public | random (auto if blank)",
+          "inherited": true
+        },
+        {
+          "name": "bdaddr",
+          "shorthand": "b",
+          "type": "string",
+          "usage": "remote BD_ADDR (XX:XX:XX:XX:XX:XX)",
+          "inherited": true
+        },
+        {
+          "name": "format",
+          "shorthand": "o",
+          "type": "string",
+          "default": "text",
+          "usage": "output format: text | json | jsonl (json/jsonl output is authoritative; do not re-run in text mode)",
+          "inherited": true
+        },
+        {
+          "name": "json",
+          "type": "bool",
+          "default": "false",
+          "usage": "deprecated alias for --format jsonl",
+          "inherited": true,
+          "hidden": true
+        },
+        {
+          "name": "quiet",
+          "shorthand": "q",
+          "type": "bool",
+          "default": "false",
+          "usage": "suppress informational status lines on stderr (data + errors still emitted)",
+          "inherited": true
+        },
+        {
+          "name": "socket",
+          "type": "string",
+          "usage": "Unix socket path (default: $CAERULEUS_SOCK or ~/.cache/caeruleus/serve.sock)"
+        },
+        {
+          "name": "timeout",
+          "shorthand": "t",
+          "type": "int",
+          "default": "45",
+          "usage": "operation timeout, seconds",
+          "inherited": true
+        },
+        {
+          "name": "verbose",
+          "shorthand": "v",
+          "type": "bool",
+          "default": "false",
+          "usage": "verbose diagnostic logging on stderr",
+          "inherited": true
+        }
+      ]
+    },
+    {
+      "path": "caeruleus serve",
+      "use": "serve",
+      "short": "Run a long-lived daemon holding one GATT link; clients dispatch over a Unix socket",
+      "runnable": true,
+      "flags": [
+        {
+          "name": "adapter",
+          "shorthand": "i",
+          "type": "string",
+          "default": "hci0",
+          "usage": "HCI adapter name (e.g. hci0)",
+          "inherited": true
+        },
+        {
+          "name": "addr-type",
+          "type": "string",
+          "usage": "address type: public | random (auto if blank)",
+          "inherited": true
+        },
+        {
+          "name": "bdaddr",
+          "shorthand": "b",
+          "type": "string",
+          "usage": "remote BD_ADDR (XX:XX:XX:XX:XX:XX)",
+          "inherited": true
+        },
+        {
+          "name": "format",
+          "shorthand": "o",
+          "type": "string",
+          "default": "text",
+          "usage": "output format: text | json | jsonl (json/jsonl output is authoritative; do not re-run in text mode)",
+          "inherited": true
+        },
+        {
+          "name": "json",
+          "type": "bool",
+          "default": "false",
+          "usage": "deprecated alias for --format jsonl",
+          "inherited": true,
+          "hidden": true
+        },
+        {
+          "name": "quiet",
+          "shorthand": "q",
+          "type": "bool",
+          "default": "false",
+          "usage": "suppress informational status lines on stderr (data + errors still emitted)",
+          "inherited": true
+        },
+        {
+          "name": "socket",
+          "type": "string",
+          "default": "/root/.cache/caeruleus/serve.sock",
+          "usage": "Unix socket path to listen on"
+        },
+        {
+          "name": "timeout",
+          "shorthand": "t",
+          "type": "int",
+          "default": "45",
+          "usage": "operation timeout, seconds",
+          "inherited": true
+        },
+        {
+          "name": "verbose",
+          "shorthand": "v",
+          "type": "bool",
+          "default": "false",
+          "usage": "verbose diagnostic logging on stderr",
+          "inherited": true
+        }
+      ]
+    },
+    {
+      "path": "caeruleus shell",
+      "use": "shell",
+      "short": "Open an interactive readline shell against a device",
+      "aliases": [
+        "interactive"
+      ],
+      "runnable": true,
+      "flags": [
+        {
+          "name": "adapter",
+          "shorthand": "i",
+          "type": "string",
+          "default": "hci0",
+          "usage": "HCI adapter name (e.g. hci0)",
+          "inherited": true
+        },
+        {
+          "name": "addr-type",
+          "type": "string",
+          "usage": "address type: public | random (auto if blank)",
+          "inherited": true
+        },
+        {
+          "name": "bdaddr",
+          "shorthand": "b",
+          "type": "string",
+          "usage": "remote BD_ADDR (XX:XX:XX:XX:XX:XX)",
+          "inherited": true
+        },
+        {
+          "name": "format",
+          "shorthand": "o",
+          "type": "string",
+          "default": "text",
+          "usage": "output format: text | json | jsonl (json/jsonl output is authoritative; do not re-run in text mode)",
+          "inherited": true
+        },
+        {
+          "name": "json",
+          "type": "bool",
+          "default": "false",
+          "usage": "deprecated alias for --format jsonl",
+          "inherited": true,
+          "hidden": true
+        },
+        {
+          "name": "quiet",
+          "shorthand": "q",
+          "type": "bool",
+          "default": "false",
+          "usage": "suppress informational status lines on stderr (data + errors still emitted)",
+          "inherited": true
+        },
+        {
+          "name": "timeout",
+          "shorthand": "t",
+          "type": "int",
+          "default": "45",
+          "usage": "operation timeout, seconds",
+          "inherited": true
+        },
+        {
+          "name": "verbose",
+          "shorthand": "v",
+          "type": "bool",
+          "default": "false",
+          "usage": "verbose diagnostic logging on stderr",
+          "inherited": true
+        }
+      ]
+    },
+    {
+      "path": "caeruleus unpair",
+      "use": "unpair",
+      "short": "Drop the bond / pairing for -b BDADDR (BlueZ Adapter1.RemoveDevice)",
+      "runnable": true,
+      "flags": [
+        {
+          "name": "adapter",
+          "shorthand": "i",
+          "type": "string",
+          "default": "hci0",
+          "usage": "HCI adapter name (e.g. hci0)",
+          "inherited": true
+        },
+        {
+          "name": "addr-type",
+          "type": "string",
+          "usage": "address type: public | random (auto if blank)",
+          "inherited": true
+        },
+        {
+          "name": "bdaddr",
+          "shorthand": "b",
+          "type": "string",
+          "usage": "remote BD_ADDR (XX:XX:XX:XX:XX:XX)",
+          "inherited": true
+        },
+        {
+          "name": "format",
+          "shorthand": "o",
+          "type": "string",
+          "default": "text",
+          "usage": "output format: text | json | jsonl (json/jsonl output is authoritative; do not re-run in text mode)",
+          "inherited": true
+        },
+        {
+          "name": "json",
+          "type": "bool",
+          "default": "false",
+          "usage": "deprecated alias for --format jsonl",
+          "inherited": true,
+          "hidden": true
+        },
+        {
+          "name": "quiet",
+          "shorthand": "q",
+          "type": "bool",
+          "default": "false",
+          "usage": "suppress informational status lines on stderr (data + errors still emitted)",
+          "inherited": true
+        },
+        {
+          "name": "timeout",
+          "shorthand": "t",
+          "type": "int",
+          "default": "45",
+          "usage": "operation timeout, seconds",
+          "inherited": true
+        },
+        {
+          "name": "verbose",
+          "shorthand": "v",
+          "type": "bool",
+          "default": "false",
+          "usage": "verbose diagnostic logging on stderr",
+          "inherited": true
+        }
+      ]
+    },
+    {
+      "path": "caeruleus write",
+      "use": "write",
+      "short": "Write a value to a characteristic by handle (-a) or UUID (-u)",
+      "aliases": [
+        "char-write"
+      ],
+      "runnable": true,
+      "flags": [
+        {
+          "name": "adapter",
+          "shorthand": "i",
+          "type": "string",
+          "default": "hci0",
+          "usage": "HCI adapter name (e.g. hci0)",
+          "inherited": true
+        },
+        {
+          "name": "addr-type",
+          "type": "string",
+          "usage": "address type: public | random (auto if blank)",
+          "inherited": true
+        },
+        {
+          "name": "bdaddr",
+          "shorthand": "b",
+          "type": "string",
+          "usage": "remote BD_ADDR (XX:XX:XX:XX:XX:XX)",
+          "inherited": true
+        },
+        {
+          "name": "each-line",
+          "type": "bool",
+          "default": "false",
+          "usage": "read stdin one ASCII payload per line and write each to --handle"
+        },
+        {
+          "name": "format",
+          "shorthand": "o",
+          "type": "string",
+          "default": "text",
+          "usage": "output format: text | json | jsonl (json/jsonl output is authoritative; do not re-run in text mode)",
+          "inherited": true
+        },
+        {
+          "name": "handle",
+          "shorthand": "a",
+          "type": "string",
+          "usage": "ATT handle (e.g. 0x002c)"
+        },
+        {
+          "name": "json",
+          "type": "bool",
+          "default": "false",
+          "usage": "deprecated alias for --format jsonl",
+          "inherited": true,
+          "hidden": true
+        },
+        {
+          "name": "quiet",
+          "shorthand": "q",
+          "type": "bool",
+          "default": "false",
+          "usage": "suppress informational status lines on stderr (data + errors still emitted)",
+          "inherited": true
+        },
+        {
+          "name": "req",
+          "type": "bool",
+          "default": "false",
+          "usage": "use write-with-response (write request) instead of write-command"
+        },
+        {
+          "name": "retry",
+          "type": "int",
+          "default": "0",
+          "usage": "retry up to N times when the operation fails with a transient BlueZ/HCI error"
+        },
+        {
+          "name": "retry-delay",
+          "type": "duration",
+          "default": "500ms",
+          "usage": "delay between retries"
+        },
+        {
+          "name": "string",
+          "shorthand": "s",
+          "type": "string",
+          "usage": "ASCII string to write (alternative to -n)"
+        },
+        {
+          "name": "timeout",
+          "shorthand": "t",
+          "type": "int",
+          "default": "45",
+          "usage": "operation timeout, seconds",
+          "inherited": true
+        },
+        {
+          "name": "uuid",
+          "shorthand": "u",
+          "type": "string",
+          "usage": "characteristic UUID"
+        },
+        {
+          "name": "value",
+          "shorthand": "n",
+          "type": "string",
+          "usage": "hex value to write (e.g. deadbeef)"
+        },
+        {
+          "name": "verbose",
+          "shorthand": "v",
+          "type": "bool",
+          "default": "false",
+          "usage": "verbose diagnostic logging on stderr",
+          "inherited": true
+        }
+      ]
+    }
+  ]
+}

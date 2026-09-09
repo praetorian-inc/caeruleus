@@ -6,7 +6,7 @@ CAERULEUS := ./caeruleus
 HARNESS   := ./shell-harness
 ADDR      ?=
 
-.PHONY: build install harness test test-unit test-shell test-shell-device clean
+.PHONY: build install harness test test-unit test-shell test-shell-device clean cli-docs
 
 build:
 	go build -o $(CAERULEUS) ./cmd/caeruleus
@@ -37,6 +37,11 @@ test-shell-device: build harness
 		exit 2; \
 	fi
 	$(HARNESS) --addr $(ADDR) --keep-running
+
+cli-docs:
+	@GOWORK=off go test ./internal/cli -list 'TestCLISurface' | grep -qE '^TestCLISurface$$' \
+	  || { echo "cli-docs: 'go test -list' did not report TestCLISurface in ./internal/cli. Either the -update writer was renamed, or the package failed to build -- run 'go build ./internal/cli' to tell which. 'go test -run' exits 0 when its pattern matches nothing, so without this check the target would report success having regenerated nothing at all."; exit 1; }
+	GOWORK=off go test ./internal/cli -run 'TestCLISurface' -count=1 -update
 
 clean:
 	rm -f $(CAERULEUS) $(HARNESS)

@@ -1,0 +1,19 @@
+# Flag names documentation may mention even though the CLI does not accept them.
+#
+# The CLI-surface doc lint (see internal/cli/cli_surface_test.go) checks every caeruleus invocation in
+# a fenced code block, every backticked flag name in prose, and every flag name
+# in a Go comment under the configured Go directories against the flags cobra
+# actually registers. This file is the escape hatch for deliberate mentions.
+# Every entry MUST carry a '#' reason: the gate rejects an entry without one,
+# because an unexplained exception is how a stale flag reference survives forever.
+#
+# Keep this list as short as possible. If a mention is not deliberate, fix the
+# document instead of allowing it.
+
+--char-read-hnd   # gatttool flag, named in README/quick-reference as the previous method caeruleus replaces
+--char-write-req  # gatttool flag, named in README/quick-reference as the previous method caeruleus replaces
+--addr            # shell-harness flag, not a caeruleus flag; cmd/shell-harness/main.go documents the harness
+--bin             # shell-harness flag, not a caeruleus flag; cmd/shell-harness/main.go documents the harness
+--scan            # not a flag: internal/bluez/signals.go names the scan subcommand
+--print-all       # not a flag: internal/cli/shell.go describes a hypothetical loop-read option
+--no-bluez        # not a flag: internal/l2cap/l2cap.go describes raw ATT fuzz runs that bypass BlueZ
