@@ -8,7 +8,7 @@ require (
 	github.com/fatih/color v1.19.0
 	github.com/godbus/dbus/v5 v5.2.2
 	github.com/jedib0t/go-pretty/v6 v6.7.10
-	github.com/praetorian-inc/capability-sdk v0.0.0-20260908174325-de5f920e8132
+	github.com/praetorian-inc/capability-sdk v0.0.0-20260911152927-8c267220a40d
 	github.com/praetorian-inc/titus v1.2.1
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.11.1
