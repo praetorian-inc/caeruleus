@@ -106,6 +106,8 @@ github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c h1:+mdjkGKdHQG3305AYmd
 github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c/go.mod h1:7rwL4CYBLnjLxUqIJNnCWiEdr3bn6IUYi15bNlnbCCU=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
+github.com/praetorian-inc/capability-sdk v0.0.0-20260911152927-8c267220a40d h1:74+j2086NBpKiR5suMbkMsRwyO7V9mcG5apmQRZAmys=
+github.com/praetorian-inc/capability-sdk v0.0.0-20260911152927-8c267220a40d/go.mod h1:GIGyQzJdEX1VoKD89/z10nZOrwqSYqyaiktBcwFLXsk=
 github.com/praetorian-inc/titus v1.2.1 h1:RK/KGsR28znA/WXt/1fedpxpXVxi1jU+n21aSc2XP4o=
 github.com/praetorian-inc/titus v1.2.1/go.mod h1:Hrjwlww3Ces8WHejO3OOZJP/7ZVMo3CAZAsoniNl30g=
 github.com/rogpeppe/go-internal v1.12.0 h1:exVL4IDcn6na9z1rAb56Vxr+CgyK3nn3O+epU5NdKM8=

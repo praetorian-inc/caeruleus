@@ -139,6 +139,60 @@ An interactive `shell` (gatttool-style verbs), a stdin `batch` mode, and a `serv
 
 ## Command Reference
 
+<!-- BEGIN generated: cli-subcommands -->
+Caeruleus organizes its functionality into these focused subcommands:
+
+```bash
+caeruleus adapter         # Inspect or recover the local HCI adapter
+caeruleus assess          # Active security tests: auth, encryption, pairing, write-without-response, DFU
+caeruleus batch           # Run shell commands from stdin against a single persistent connection
+caeruleus bdaddr          # Read or spoof the adapter's BD_ADDR (needs root; vendor-specific)
+caeruleus cccd            # Manipulate a Client Characteristic Configuration Descriptor
+caeruleus characteristics # List characteristics (gatttool --characteristics)
+caeruleus completion      # Generate a shell completion script
+caeruleus conn-params     # Report the negotiated connection parameters for -b BDADDR (needs root)
+caeruleus disconnect      # Disconnect a peripheral and wait for Connected=false
+caeruleus doctor          # One-shot adapter / bluetoothd health summary with suggested fixes
+caeruleus enumerate       # Print a device's full GATT tree as a table (--values also reads each characteristic)
+caeruleus forget          # Tell bluetoothd to purge cached state for -b BDADDR
+caeruleus fuzz            # Fuzz a GATT server (mutates writes, classifies responses)
+caeruleus listen          # Subscribe to notifications/indications on a characteristic
+caeruleus monitor         # Passively decode ATT notifications/indications from the HCI monitor socket (needs root)
+caeruleus mtu             # Read or set the requested ATT MTU (set/reset require root + bluetoothd restart)
+caeruleus pair            # Pair / bond with -b BDADDR (BlueZ Device1.Pair)
+caeruleus primary         # List primary services (gatttool --primary)
+caeruleus raw-write       # Single-PDU ATT Write Request via raw L2CAP (bypasses BlueZ MTU + fragmentation)
+caeruleus read            # Read a characteristic by handle (-a) or UUID (-u)
+caeruleus recipes         # Find the right command by describing what you want to do
+caeruleus recon           # Profile -b BDADDR: fingerprint (DIS), service map, and GATT audit
+caeruleus scan            # Scan for nearby BLE devices
+caeruleus send            # Send one shell command to a running 'caeruleus serve' daemon
+caeruleus serve           # Run a long-lived daemon holding one GATT link; clients dispatch over a Unix socket
+caeruleus shell           # Open an interactive readline shell against a device
+caeruleus unpair          # Drop the bond / pairing for -b BDADDR (BlueZ Adapter1.RemoveDevice)
+caeruleus write           # Write a value to a characteristic by handle (-a) or UUID (-u)
+```
+<!-- END generated: cli-subcommands -->
+
+<!-- BEGIN generated: cli-aliases -->
+Some subcommands carry aliases for discoverability:
+
+| Subcommand | Aliases |
+| --- | --- |
+| `characteristics` | `chars` |
+| `conn-params` | `connparams`, `cparams` |
+| `disconnect` | `dc` |
+| `enumerate` | `enum` |
+| `forget` | `rm`, `remove` |
+| `listen` | `notify`, `subscribe` |
+| `read` | `char-read` |
+| `shell` | `interactive` |
+| `write` | `char-write` |
+
+The full reference — every subcommand, alias and flag, including the ones hidden from `--help` — is generated into [docs/CLI.md](docs/CLI.md).
+<!-- END generated: cli-aliases -->
+
+
 | Group | Commands |
 |---|---|
 | Discovery | `scan`, `enumerate`, `primary`, `characteristics` |
